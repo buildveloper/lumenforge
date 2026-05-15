@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { auth } from "@clerk/nextjs/server";
-import { eq, and, desc, count, sql } from "drizzle-orm";
+import { eq, and, desc, count, sql, isNull } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { invoices, projects, clients } from "@/db/schema";
 import {
@@ -13,7 +13,7 @@ import {
   type CreateInvoiceInput,
   type UpdateInvoiceInput,
 } from "@/lib/validation";
-import { logActivity } from "@/server/actions/activity";
+import { logActivity } from "@/server/helpers/log-activity";
 import { getUserRole } from "@/server/actions/user";
 
 async function getUserId(): Promise<string> {
@@ -26,7 +26,7 @@ async function verifyProjectAccess(projectId: string, userId: string) {
   const [project] = await db
     .select({ userId: projects.userId })
     .from(projects)
-    .where(and(eq(projects.id, projectId)))
+    .where(and(eq(projects.id, projectId), isNull(projects.deletedAt)))
     .limit(1);
   if (!project) throw new Error("Project not found");
   if (project.userId !== userId) throw new Error("Forbidden");
@@ -40,6 +40,7 @@ async function generateInvoiceNumber(): Promise<string> {
   const [last] = await db
     .select({ number: invoices.invoiceNumber })
     .from(invoices)
+    .where(isNull(invoices.deletedAt))
     .orderBy(desc(invoices.createdAt))
     .limit(1);
 
@@ -107,13 +108,20 @@ export async function getUserInvoices(
   const offset = (page - 1) * limit;
 
   let conditions = [];
+  conditions.push(isNull(invoices.deletedAt));
   if (role === "freelancer" || role === "user") {
+    conditions.push(eq(invoices.userId, userId));
+  } else if (role === "client") {
+    conditions.push(eq(invoices.clientId, userId));
+  } else {
     conditions.push(eq(invoices.userId, userId));
   }
 
+  if (statusFilter) {
     conditions.push(
       eq(invoices.status, statusFilter as "draft" | "sent" | "paid" | "overdue" | "cancelled")
     );
+  }
 
   const whereClause = conditions.length > 0 ? and(...conditions) : undefined;
 
@@ -183,7 +191,7 @@ export async function getInvoiceById(invoiceId: string) {
     .from(invoices)
     .leftJoin(projects, eq(invoices.projectId, projects.id))
     .leftJoin(clients, eq(invoices.clientId, clients.id))
-    .where(eq(invoices.id, invoiceId))
+    .where(and(eq(invoices.id, invoiceId), isNull(invoices.deletedAt)))
     .limit(1);
 
   if (!invoice) throw new Error("Invoice not found");
@@ -204,7 +212,7 @@ export async function updateInvoice(
   const [invoice] = await db
     .select({ userId: invoices.userId, projectId: invoices.projectId })
     .from(invoices)
-    .where(eq(invoices.id, invoiceId))
+    .where(and(eq(invoices.id, invoiceId), isNull(invoices.deletedAt)))
     .limit(1);
 
   if (!invoice) throw new Error("Invoice not found");
@@ -222,7 +230,7 @@ export async function updateInvoice(
       paidAt: parsed.status === "paid" ? now : undefined,
       updatedAt: now,
     })
-    .where(eq(invoices.id, invoiceId));
+    .where(and(eq(invoices.id, invoiceId), isNull(invoices.deletedAt)));
 
   await logActivity({
     userId,
@@ -252,7 +260,7 @@ export async function updateInvoiceStatus(
   const [invoice] = await db
     .select({ userId: invoices.userId, projectId: invoices.projectId })
     .from(invoices)
-    .where(eq(invoices.id, invoiceId))
+    .where(and(eq(invoices.id, invoiceId), isNull(invoices.deletedAt)))
     .limit(1);
 
   if (!invoice) throw new Error("Invoice not found");
@@ -267,7 +275,7 @@ export async function updateInvoiceStatus(
       paidAt: parsed.status === "paid" ? now : undefined,
       updatedAt: now,
     })
-    .where(eq(invoices.id, invoiceId));
+    .where(and(eq(invoices.id, invoiceId), isNull(invoices.deletedAt)));
 
   await logActivity({
     userId,
@@ -294,8 +302,43 @@ export async function getProjectInvoices(projectId: string) {
   return db
     .select()
     .from(invoices)
-    .where(eq(invoices.projectId, projectId))
+    .where(and(eq(invoices.projectId, projectId), isNull(invoices.deletedAt)))
     .orderBy(desc(invoices.createdAt));
+}
+
+// -- Soft Delete Invoice ------------------------------------------------------
+
+export async function softDeleteInvoice(invoiceId: string) {
+  const userId = await getUserId();
+
+  const [invoice] = await db
+    .select({ userId: invoices.userId, projectId: invoices.projectId })
+    .from(invoices)
+    .where(and(eq(invoices.id, invoiceId), isNull(invoices.deletedAt)))
+    .limit(1);
+
+  if (!invoice) throw new Error("Invoice not found");
+  if (invoice.userId !== userId) throw new Error("Forbidden");
+
+  const now = new Date().toISOString();
+  await db
+    .update(invoices)
+    .set({ deletedAt: now, updatedAt: now })
+    .where(eq(invoices.id, invoiceId));
+
+  await logActivity({
+    userId,
+    action: "invoice.deleted",
+    entityType: "invoice",
+    entityId: invoiceId,
+  });
+
+  revalidatePath("/dashboard");
+  revalidatePath("/dashboard/invoices");
+  if (invoice.projectId) {
+    revalidatePath(`/dashboard/projects/${invoice.projectId}`);
+  }
+  return { success: true };
 }
 
 // -- Counts (for dashboard) ----------------------------------------------------
@@ -305,7 +348,7 @@ export async function getOutstandingInvoiceAmount() {
   const rows = await db
     .select()
     .from(invoices)
-    .where(eq(invoices.userId, userId));
+    .where(and(eq(invoices.userId, userId), isNull(invoices.deletedAt)));
 
   return rows
     .filter((i) => i.status === "sent" || i.status === "overdue")
@@ -317,6 +360,6 @@ export async function getInvoiceCount() {
   const [result] = await db
     .select({ value: count() })
     .from(invoices)
-    .where(eq(invoices.userId, userId));
+    .where(and(eq(invoices.userId, userId), isNull(invoices.deletedAt)));
   return result?.value ?? 0;
 }

@@ -11,6 +11,7 @@ import {
   CheckSquare,
   Settings,
   Menu,
+  HelpCircle,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
@@ -44,7 +45,8 @@ export function Sidebar({ role }: SidebarProps) {
     <nav className="flex flex-col gap-1 px-3">
       {navItems.map((item) => {
         const isActive =
-          pathname === item.href || pathname.startsWith(item.href + "/");
+          pathname === item.href ||
+          (item.href !== "/" && pathname.startsWith(item.href));
         return (
           <Link
             key={item.href}
@@ -76,7 +78,7 @@ export function Sidebar({ role }: SidebarProps) {
         <NotificationBell />
       </div>
       {roleLabel && (
-        <div className="px-3">
+        <div className="px-3 mb-2">
           <Badge
             variant={isFreelancer ? "default" : "secondary"}
             className="w-full justify-center text-xs py-1"
@@ -85,6 +87,16 @@ export function Sidebar({ role }: SidebarProps) {
           </Badge>
         </div>
       )}
+      <div className="px-3">
+        <Link
+          href="/dashboard/help"
+          onClick={() => setOpen(false)}
+          className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+        >
+          <HelpCircle className="h-4 w-4" />
+          Help & Docs
+        </Link>
+      </div>
     </div>
   );
 

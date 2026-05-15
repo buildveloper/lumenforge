@@ -6,7 +6,7 @@ import { db } from "@/lib/db";
 import { getGroqClient } from "@/lib/ai";
 import { projects, tasks, invoices } from "@/db/schema";
 import { eq, and, isNull } from "drizzle-orm";
-import { logActivity } from "@/server/actions/activity";
+import { logActivity } from "@/server/helpers/log-activity";
 
 const generateSchema = z.object({
   projectId: z.string(),
@@ -20,7 +20,7 @@ const generateSchema = z.object({
   ]),
 });
 
-async function getProjectContext(projectId: string) {
+async function getProjectContext(projectId: string, userId: string) {
   const [project] = await db
     .select({
       title: projects.title,
@@ -30,7 +30,7 @@ async function getProjectContext(projectId: string) {
       dueDate: projects.dueDate,
     })
     .from(projects)
-    .where(eq(projects.id, projectId))
+    .where(and(eq(projects.id, projectId), eq(projects.userId, userId), isNull(projects.deletedAt)))
     .limit(1);
 
   if (!project) return null;
@@ -80,7 +80,7 @@ export async function generateAIResponse(
 
   const parsed = generateSchema.parse({ projectId, prompt, type });
 
-  const context = await getProjectContext(parsed.projectId);
+  const context = await getProjectContext(parsed.projectId, userId);
   if (!context) throw new Error("Project not found");
 
   const systemPrompt = SYSTEM_PROMPTS[parsed.type] ?? SYSTEM_PROMPTS.general;

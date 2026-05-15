@@ -13,33 +13,6 @@ async function getUserId(): Promise<string> {
   return userId;
 }
 
-function generateId(): string {
-  return crypto.randomUUID();
-}
-
-// -- Log Activity -------------------------------------------------------------
-
-export async function logActivity({
-  userId,
-  action,
-  entityType,
-  entityId,
-}: {
-  userId: string;
-  action: string;
-  entityType: string;
-  entityId: string;
-}) {
-  await db.insert(activityLogs).values({
-    id: generateId(),
-    userId,
-    action,
-    entityType,
-    entityId,
-    createdAt: new Date().toISOString(),
-  });
-}
-
 // -- Get Recent Activity ------------------------------------------------------
 
 export async function getRecentActivity(limit = 10) {

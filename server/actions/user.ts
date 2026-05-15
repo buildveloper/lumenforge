@@ -5,7 +5,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { users } from "@/db/schema";
 import { updateRoleSchema, type UpdateRoleInput } from "@/lib/validation";
-import { logActivity } from "@/server/actions/activity";
+import { logActivity } from "@/server/helpers/log-activity";
 import { revalidatePath } from "next/cache";
 
 async function getUserId(): Promise<string> {

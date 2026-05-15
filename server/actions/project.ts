@@ -13,8 +13,8 @@ import {
   type CreateProjectInput,
   type UpdateProjectInput,
 } from "@/lib/validation";
-import { logActivity } from "@/server/actions/activity";
-import { createNotification } from "@/server/actions/notification";
+import { logActivity } from "@/server/helpers/log-activity";
+import { createNotification } from "@/server/helpers/create-notification";
 import { getUserRole } from "@/server/actions/user";
 
 async function getUserId(): Promise<string> {

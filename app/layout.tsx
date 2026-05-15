@@ -19,6 +19,35 @@ export const metadata: Metadata = {
   title: "LumenForge — Run your freelance business in one place",
   description:
     "Client management, project tracking, invoicing, and tasks — beautifully integrated for freelancers.",
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"),
+  keywords: [
+    "freelance",
+    "project management",
+    "invoicing",
+    "client portal",
+    "SaaS",
+    "freelancer tools",
+    "business management",
+  ],
+  robots: { index: true, follow: true },
+  openGraph: {
+    type: "website",
+    siteName: "LumenForge",
+    title: "LumenForge — Run your freelance business in one place",
+    description:
+      "Project management, client portal, invoicing, and AI assistance — all in a beautiful, secure workspace built for independent professionals.",
+    url: "/",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "LumenForge — Run your freelance business in one place",
+    description:
+      "Project management, client portal, invoicing, and AI assistance — all in a beautiful, secure workspace.",
+  },
+  icons: {
+    icon: "/favicon.svg",
+    shortcut: "/favicon.svg",
+  },
 };
 
 export default function RootLayout({
@@ -45,6 +74,7 @@ export default function RootLayout({
             defaultTheme="dark"
             enableSystem
             disableTransitionOnChange
+            enableColorScheme={false}
           >
             {children}
             <Toaster />

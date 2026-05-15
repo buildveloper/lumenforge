@@ -141,6 +141,7 @@ export const invoices = sqliteTable("invoices", {
   updatedAt: text("updated_at")
     .notNull()
     .default(sql`(datetime('now'))`),
+  deletedAt: text("deleted_at"),
 });
 
 // -- Tasks table --------------------------------------------------------------

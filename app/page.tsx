@@ -147,7 +147,7 @@ export default function Home() {
                 variant="secondary"
                 className="mb-8 px-4 py-1.5 text-sm font-medium"
               >
-                Trusted by freelancers worldwide
+                Built for professional freelancers
               </Badge>
 
               <h1 className="max-w-4xl text-4xl font-bold tracking-tight text-foreground sm:text-5xl lg:text-6xl lg:leading-[1.1]">
@@ -315,7 +315,7 @@ export default function Home() {
                 Testimonials
               </Badge>
               <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
-                Trusted by independent professionals
+                What our users say
               </h2>
               <p className="mt-4 text-lg text-muted-foreground max-w-2xl mx-auto">
                 Join freelancers who&apos;ve streamlined their operations with
@@ -415,18 +415,18 @@ export default function Home() {
             >
               Features
             </a>
-            <a
-              href="#pricing"
+            <Link
+              href="/privacy"
               className="hover:text-foreground transition-colors"
             >
-              Pricing
-            </a>
-            <a
-              href="#testimonials"
+              Privacy
+            </Link>
+            <Link
+              href="/terms"
               className="hover:text-foreground transition-colors"
             >
-              Testimonials
-            </a>
+              Terms
+            </Link>
           </nav>
           <span className="text-sm text-muted-foreground">
             &copy; {new Date().getFullYear()} LumenForge. Built for freelancers.

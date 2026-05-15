@@ -11,7 +11,7 @@ import {
   paginationSchema,
   type CreateClientInput,
 } from "@/lib/validation";
-import { logActivity } from "@/server/actions/activity";
+import { logActivity } from "@/server/helpers/log-activity";
 
 async function getUserId(): Promise<string> {
   const { userId } = await auth();

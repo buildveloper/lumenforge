@@ -18,6 +18,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import Link from "next/link";
 import { InvoiceDetailClient } from "./invoice-detail-client";
 import { getInvoiceById } from "@/server/actions/invoice";
+import { Breadcrumbs } from "@/components/dashboard/breadcrumbs";
 
 type Props = {
   params: Promise<{ id: string }>;
@@ -41,6 +42,14 @@ export default async function InvoiceDetailPage({ params }: Props) {
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-8 sm:px-6">
+      <Breadcrumbs
+        items={[
+          { label: "Dashboard", href: "/dashboard" },
+          { label: "Invoices", href: "/dashboard/invoices" },
+          { label: invoice.invoiceNumber },
+        ]}
+      />
+
       {/* -- Back */}
       <Button variant="ghost" size="sm" className="gap-2 mb-8" asChild>
         <Link href="/dashboard/invoices">
@@ -65,7 +74,7 @@ export default async function InvoiceDetailPage({ params }: Props) {
           <StatusBadge status={invoice.status} />
         </div>
 
-        <InvoiceDetailClient invoice={invoice} />
+        <StatusBadge status={invoice.status} />
       </div>
 
       {/* -- Amount (big) */}

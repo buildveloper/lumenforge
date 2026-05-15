@@ -14,7 +14,17 @@ export default async function SettingsPage() {
   const { userId } = await auth();
   if (!userId) redirect("/sign-in");
 
-  const user = await currentUser();
+  const clerkUser = await currentUser();
+  const user = clerkUser
+    ? {
+        firstName: clerkUser.firstName,
+        lastName: clerkUser.lastName,
+        emailAddresses: clerkUser.emailAddresses.map((e) => ({
+          emailAddress: e.emailAddress,
+        })),
+        imageUrl: clerkUser.imageUrl,
+      }
+    : null;
 
   return (
     <div className="flex flex-col min-h-screen">
@@ -99,12 +109,15 @@ export default async function SettingsPage() {
                     "AI generation completed",
                   ].map((item) => (
                     <div key={item} className="flex items-center justify-between py-2">
-                      <span className="text-sm">{item}</span>
-                      <div className="h-5 w-9 rounded-full bg-primary/20 relative cursor-pointer">
-                        <div className="absolute right-0.5 top-0.5 h-4 w-4 rounded-full bg-primary" />
+                      <span className="text-sm text-muted-foreground">{item}</span>
+                      <div className="h-5 w-9 rounded-full bg-muted relative cursor-not-allowed opacity-50">
+                        <div className="absolute right-0.5 top-0.5 h-4 w-4 rounded-full bg-muted-foreground/40" />
                       </div>
                     </div>
                   ))}
+                  <p className="text-xs text-muted-foreground pt-2">
+                    Notification preferences coming soon. All notifications are currently enabled.
+                  </p>
                 </CardContent>
               </Card>
             </TabsContent>

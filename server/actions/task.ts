@@ -13,7 +13,7 @@ import {
   type UpdateTaskInput,
   type UpdateTaskStatusInput,
 } from "@/lib/validation";
-import { logActivity } from "@/server/actions/activity";
+import { logActivity } from "@/server/helpers/log-activity";
 
 async function getUserId(): Promise<string> {
   const { userId } = await auth();
@@ -104,6 +104,18 @@ export async function getProjectTasks(projectId: string) {
     .orderBy(desc(tasks.updatedAt));
 }
 
+// -- Get All User Tasks --------------------------------------------------------
+
+export async function getUserTasks() {
+  const userId = await getUserId();
+
+  return db
+    .select()
+    .from(tasks)
+    .where(and(eq(tasks.userId, userId), isNull(tasks.deletedAt)))
+    .orderBy(desc(tasks.updatedAt));
+}
+
 // -- Update Task ---------------------------------------------------------------
 
 export async function updateTask(taskId: string, input: UpdateTaskInput) {
@@ -162,6 +174,13 @@ export async function updateTaskStatus(
     .update(tasks)
     .set({ status, updatedAt: now })
     .where(eq(tasks.id, taskId));
+
+  await logActivity({
+    userId,
+    action: "task.status_updated",
+    entityType: "task",
+    entityId: taskId,
+  });
 
   const [task] = await db
     .select({ projectId: tasks.projectId })

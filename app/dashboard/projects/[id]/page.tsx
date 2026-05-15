@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import Link from "next/link";
 import { ProjectDetailClient } from "./project-detail-client";
+import { Breadcrumbs } from "@/components/dashboard/breadcrumbs";
 import { getProjectById } from "@/server/actions/project";
 import { getProjectTasks } from "@/server/actions/task";
 import { getProjectInvoices } from "@/server/actions/invoice";
@@ -53,6 +54,14 @@ export default async function ProjectDetailPage({ params }: Props) {
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6">
+      <Breadcrumbs
+        items={[
+          { label: "Dashboard", href: "/dashboard" },
+          { label: "Projects", href: "/dashboard/projects" },
+          { label: project.title },
+        ]}
+      />
+
       {/* -- Back + Edit ------------------------------------------ */}
       <div className="flex items-center justify-between mb-6">
         <Button variant="ghost" size="sm" className="gap-2" asChild>

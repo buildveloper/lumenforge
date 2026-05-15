@@ -93,6 +93,10 @@ export const updateInvoiceSchema = z.object({
   status: z.enum(["draft", "sent", "paid", "overdue", "cancelled"]).optional(),
 });
 
+export const deleteInvoiceSchema = z.object({
+  invoiceId: requiredString,
+});
+
 // -- Task schemas -------------------------------------------------------------
 
 export const createTaskSchema = z.object({
