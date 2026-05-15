@@ -403,34 +403,82 @@ export default function Home() {
 
       {/* -- Footer ------------------------------------------------- */}
       <footer className="border-t border-border/40">
-        <div className="mx-auto flex max-w-6xl flex-col gap-4 px-4 py-8 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-          <div className="flex items-center gap-2">
-            <Briefcase className="h-4 w-4 text-primary" />
-            <span className="font-medium text-foreground">LumenForge</span>
+        <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6 space-y-8">
+          {/* Top row: brand + links */}
+          <div className="flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <Briefcase className="h-4 w-4 text-primary" />
+                <span className="font-medium text-foreground">LumenForge</span>
+              </div>
+              <p className="text-sm text-muted-foreground max-w-xs">
+                Run your freelance business in one place.
+              </p>
+            </div>
+            <nav className="flex flex-wrap gap-6 text-sm text-muted-foreground">
+              <a
+                href="#features"
+                className="hover:text-foreground transition-colors"
+              >
+                Features
+              </a>
+              <Link
+                href="/privacy"
+                className="hover:text-foreground transition-colors"
+              >
+                Privacy
+              </Link>
+              <Link
+                href="/terms"
+                className="hover:text-foreground transition-colors"
+              >
+                Terms
+              </Link>
+            </nav>
           </div>
-          <nav className="flex items-center gap-6 text-sm text-muted-foreground">
-            <a
-              href="#features"
-              className="hover:text-foreground transition-colors"
-            >
-              Features
-            </a>
-            <Link
-              href="/privacy"
-              className="hover:text-foreground transition-colors"
-            >
-              Privacy
-            </Link>
-            <Link
-              href="/terms"
-              className="hover:text-foreground transition-colors"
-            >
-              Terms
-            </Link>
-          </nav>
-          <span className="text-sm text-muted-foreground">
-            &copy; {new Date().getFullYear()} LumenForge. Built for freelancers.
-          </span>
+
+          {/* Divider */}
+          <div className="border-t border-border/40 pt-8 space-y-4">
+            <div className="text-sm text-muted-foreground leading-relaxed max-w-2xl">
+              <p>
+                Built by{" "}
+                <a
+                  href="https://buildveloper.com"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-foreground hover:text-primary transition-colors font-medium"
+                >
+                  Christopher John (Buildveloper)
+                </a>{" "}
+                as a portfolio project to showcase modern full-stack development.
+              </p>
+              <p className="mt-1">
+                This is a complete AI-enhanced Freelancer/Client Portal SaaS featuring
+                Project Management, Kanban, Invoicing, and Groq AI integration.
+              </p>
+              <div className="flex flex-wrap gap-x-6 gap-y-1 mt-3">
+                <a
+                  href="https://buildveloper.com"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-primary hover:underline transition-colors"
+                >
+                  → Visit my portfolio
+                </a>
+                <a
+                  href="https://x.com/shigusna"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-primary hover:underline transition-colors"
+                >
+                  → Follow me on X
+                </a>
+              </div>
+            </div>
+            <p className="text-xs text-muted-foreground">
+              &copy; {new Date().getFullYear()} LumenForge.
+            </p>
+          </div>
         </div>
       </footer>
     </div>
