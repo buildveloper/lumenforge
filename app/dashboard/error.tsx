@@ -12,7 +12,12 @@ export default function DashboardError({
   reset: () => void;
 }) {
   useEffect(() => {
-    console.error(error);
+    console.error(
+      "[LumenForge] Dashboard error boundary caught:",
+      error.message,
+      error.digest ? `(digest: ${error.digest})` : "",
+      error.stack
+    );
   }, [error]);
 
   return (
@@ -25,11 +30,16 @@ export default function DashboardError({
           <div className="space-y-2">
             <h2 className="text-lg font-semibold">Something went wrong</h2>
             <p className="text-sm text-muted-foreground">
-              We encountered an error loading your dashboard. Please try again.
+              We encountered an error loading your dashboard. This might be a temporary issue — please try refreshing.
             </p>
+            {error.digest && (
+              <p className="text-xs text-muted-foreground/60 font-mono">
+                Ref: {error.digest}
+              </p>
+            )}
           </div>
           <Button onClick={reset} variant="outline">
-            Try again
+            Refresh page
           </Button>
         </div>
       </div>

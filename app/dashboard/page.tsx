@@ -33,23 +33,48 @@ export default async function DashboardPage() {
     user?.emailAddresses?.[0]?.emailAddress?.split("@")[0] ??
     "there";
 
-  const [
-    { role },
-    activeProjects,
-    outstandingAmount,
-    tasksDueThisWeek,
-    clientCount,
-    recentActivity,
-    { projects: recentProjects },
-  ] = await Promise.all([
-    getDashboardData(),
-    getActiveProjectCount(),
-    getOutstandingInvoiceAmount(),
-    getTasksDueThisWeek(),
-    getClientCount(),
-    getRecentActivity(8),
-    getUserProjects({ page: 1, limit: 5 }),
-  ]);
+  let role = "user";
+  let activeProjects = 0;
+  let outstandingAmount = 0;
+  let tasksDueThisWeek = 0;
+  let clientCount = 0;
+  let recentActivity: Awaited<ReturnType<typeof getRecentActivity>> = [];
+  let recentProjects: Awaited<ReturnType<typeof getUserProjects>>["projects"] = [];
+
+  try {
+    const results = await Promise.allSettled([
+      getDashboardData(),
+      getActiveProjectCount(),
+      getOutstandingInvoiceAmount(),
+      getTasksDueThisWeek(),
+      getClientCount(),
+      getRecentActivity(8),
+      getUserProjects({ page: 1, limit: 5 }),
+    ]);
+
+    if (results[0].status === "fulfilled") role = results[0].value.role;
+    else console.error("[LumenForge] getDashboardData failed:", results[0].reason);
+
+    if (results[1].status === "fulfilled") activeProjects = results[1].value;
+    else console.error("[LumenForge] getActiveProjectCount failed:", results[1].reason);
+
+    if (results[2].status === "fulfilled") outstandingAmount = results[2].value;
+    else console.error("[LumenForge] getOutstandingInvoiceAmount failed:", results[2].reason);
+
+    if (results[3].status === "fulfilled") tasksDueThisWeek = results[3].value;
+    else console.error("[LumenForge] getTasksDueThisWeek failed:", results[3].reason);
+
+    if (results[4].status === "fulfilled") clientCount = results[4].value;
+    else console.error("[LumenForge] getClientCount failed:", results[4].reason);
+
+    if (results[5].status === "fulfilled") recentActivity = results[5].value;
+    else console.error("[LumenForge] getRecentActivity failed:", results[5].reason);
+
+    if (results[6].status === "fulfilled") recentProjects = results[6].value.projects;
+    else console.error("[LumenForge] getUserProjects failed:", results[6].reason);
+  } catch (error) {
+    console.error("[LumenForge] Dashboard page data fetch failed:", error);
+  }
 
   const isFreelancer = role === "freelancer";
   const skipRole = role === "user";

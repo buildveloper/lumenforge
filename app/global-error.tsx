@@ -1,14 +1,25 @@
 "use client";
 
+import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Briefcase, AlertTriangle } from "lucide-react";
 
 export default function GlobalError({
+  error,
   reset,
 }: {
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  useEffect(() => {
+    console.error(
+      "[LumenForge] Global error boundary caught:",
+      error.message,
+      error.digest ? `(digest: ${error.digest})` : "",
+      error.stack
+    );
+  }, [error]);
+
   return (
     <html>
       <body className="min-h-screen bg-background text-foreground antialiased">
@@ -26,12 +37,17 @@ export default function GlobalError({
             <div className="space-y-2">
               <h1 className="text-xl font-bold">Something went wrong</h1>
               <p className="text-sm text-muted-foreground">
-                A critical error occurred. Please try refreshing the page. If the problem persists, contact support.
+                A critical error occurred. Please try refreshing the page.
               </p>
+              {error.digest && (
+                <p className="text-xs text-muted-foreground/60 font-mono">
+                  Ref: {error.digest}
+                </p>
+              )}
             </div>
 
             <Button onClick={reset} variant="outline" size="lg">
-              Try again
+              Refresh page
             </Button>
           </div>
         </div>

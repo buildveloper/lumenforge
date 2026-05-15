@@ -29,6 +29,7 @@ export function RoleSelector() {
       );
       router.refresh();
     } catch (error) {
+      console.error("[LumenForge] RoleSelector updateUserRole failed:", error);
       toast.error(
         error instanceof Error ? error.message : "Failed to set role"
       );

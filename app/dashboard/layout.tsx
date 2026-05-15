@@ -12,7 +12,14 @@ export default async function DashboardLayout({
   const { userId } = await auth();
   if (!userId) redirect("/sign-in");
 
-  const { role } = await getDashboardData();
+  let role = "user";
+  try {
+    const data = await getDashboardData();
+    role = data.role;
+  } catch (error) {
+    console.error("[LumenForge] DashboardLayout getDashboardData failed:", error);
+    // Continue with "user" role — the RoleSelector will appear
+  }
 
   return (
     <div className="flex min-h-screen">
