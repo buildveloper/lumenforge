@@ -1,4 +1,4 @@
-import { auth } from "@clerk/nextjs/server";
+import { getUserId } from "@/server/helpers/session";
 import { redirect } from "next/navigation";
 
 import { FilterLinks } from "@/components/app/filter-links";
@@ -19,7 +19,7 @@ export default async function InvoicesPage({
 }: {
   searchParams: Promise<{ status?: string; new?: string }>;
 }) {
-  const { userId } = await auth();
+  const userId = await getUserId();
   if (!userId) redirect("/sign-in");
 
   const profile = await getProfile();
@@ -49,7 +49,7 @@ export default async function InvoicesPage({
             ? "Raise an invoice and it is numbered from your own sequence."
             : `${data.counts.all} invoice${data.counts.all === 1 ? "" : "s"}${
                 data.counts.overdue
-                  ? ` · ${data.counts.overdue} overdue`
+                  ? ` Â· ${data.counts.overdue} overdue`
                   : ""
               }`
         }
@@ -60,7 +60,7 @@ export default async function InvoicesPage({
               clients={clients.map((client) => ({
                 id: client.id,
                 label: client.company
-                  ? `${client.name} · ${client.company}`
+                  ? `${client.name} Â· ${client.company}`
                   : client.name,
               }))}
               projects={projects.map((project) => ({

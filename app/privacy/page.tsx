@@ -21,8 +21,10 @@ export default function PrivacyPage() {
       <h2>What we collect</h2>
       <ul>
         <li>
-          <strong>Account details</strong> — your name, email address, and
-          profile image, provided through Clerk when you sign up.
+          <strong>Account details</strong> — your name, your email address, and
+          the password you choose. The password is hashed with scrypt and a
+          per-account salt before it is stored; the plaintext is never written
+          down or logged.
         </li>
         <li>
           <strong>Records you create</strong> — clients, projects, tasks,
@@ -48,8 +50,9 @@ export default function PrivacyPage() {
       <h2>Who else sees it</h2>
       <ul>
         <li>
-          <strong>Clerk</strong> handles authentication. Your password never
-          reaches our servers.
+          <strong>Nobody handles sign-in for us.</strong> Authentication is part
+          of the app, so no third party receives your credentials and sessions
+          are rows in your own database rather than tokens held elsewhere.
         </li>
         <li>
           <strong>Groq</strong> processes AI requests. When you generate a

@@ -13,6 +13,11 @@ export const users = sqliteTable("users", {
   email: text("email").notNull().unique(),
   name: text("name"),
   avatarUrl: text("avatar_url"),
+
+  // Nullable so the migration is safe on any database that already has rows.
+  // A null hash means the account exists but cannot sign in with a password.
+  passwordHash: text("password_hash"),
+
   role: text("role", { enum: ["user", "freelancer", "client", "admin"] })
     .notNull()
     .default("user"),
@@ -60,17 +65,23 @@ export const notifications = sqliteTable("notifications", {
 });
 
 // -- Sessions table -----------------------------------------------------------
-export const sessions = sqliteTable("sessions", {
-  id: text("id").primaryKey(),
-  userId: text("user_id")
-    .notNull()
-    .references(() => users.id, { onDelete: "cascade" }),
-  tokenHash: text("token_hash").notNull().unique(),
-  expiresAt: text("expires_at").notNull(),
-  createdAt: text("created_at")
-    .notNull()
-    .default(sql`(datetime('now'))`),
-});
+// Backs sign-in. Only the SHA-256 of a token is stored, so a database leak does
+// not hand over usable sessions.
+export const sessions = sqliteTable(
+  "sessions",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    tokenHash: text("token_hash").notNull().unique(),
+    expiresAt: text("expires_at").notNull(),
+    createdAt: text("created_at")
+      .notNull()
+      .default(sql`(datetime('now'))`),
+  },
+  (table) => [index("sessions_user_id_idx").on(table.userId)]
+);
 
 // -- API keys table -----------------------------------------------------------
 export const apiKeys = sqliteTable("api_keys", {

@@ -13,13 +13,17 @@ import {
 } from "@/lib/validation";
 import { logActivity } from "@/server/helpers/log-activity";
 import { claimClientRecords } from "@/server/helpers/client-access";
-import { ensureUserRow, getClerkUser, requireUserId } from "@/server/helpers/session";
+import { requireUserId } from "@/server/helpers/session";
 
 export async function updateUserRole(input: UpdateRoleInput) {
   const userId = await requireUserId();
   const { role } = updateRoleSchema.parse(input);
 
-  await ensureUserRow();
+  const [account] = await db
+    .select({ email: users.email })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
 
   await db
     .update(users)
@@ -36,10 +40,8 @@ export async function updateUserRole(input: UpdateRoleInput) {
   // Taking the client role should immediately surface any work already
   // addressed to this person's email address.
   let claimed = 0;
-  if (role === "client") {
-    const clerkUser = await getClerkUser();
-    const email = clerkUser?.primaryEmailAddress?.emailAddress;
-    if (email) claimed = await claimClientRecords(userId, email);
+  if (role === "client" && account?.email) {
+    claimed = await claimClientRecords(userId, account.email);
   }
 
   revalidatePath("/dashboard");
@@ -49,7 +51,6 @@ export async function updateUserRole(input: UpdateRoleInput) {
 
 export async function getDashboardData() {
   const userId = await requireUserId();
-  await ensureUserRow();
 
   const [user] = await db
     .select({ role: users.role, name: users.name, email: users.email })
@@ -64,10 +65,9 @@ export async function getDashboardData() {
   };
 }
 
-/** Display name and avatar for anything that greets the user by name. */
+/** Display name and email for anything that greets the user by name. */
 export async function getProfile() {
   const userId = await requireUserId();
-  await ensureUserRow();
 
   const [row] = await db
     .select({
@@ -80,19 +80,16 @@ export async function getProfile() {
     .where(eq(users.id, userId))
     .limit(1);
 
-  const clerkUser = await getClerkUser();
-
   return {
-    name: row?.name ?? clerkUser?.fullName ?? null,
-    email: row?.email ?? clerkUser?.primaryEmailAddress?.emailAddress ?? null,
+    name: row?.name ?? null,
+    email: row?.email ?? null,
     role: row?.role ?? "user",
-    avatarUrl: row?.avatarUrl ?? clerkUser?.imageUrl ?? null,
+    avatarUrl: row?.avatarUrl ?? null,
   };
 }
 
 export async function getNotificationPreferences() {
   const userId = await requireUserId();
-  await ensureUserRow();
 
   const [row] = await db
     .select({

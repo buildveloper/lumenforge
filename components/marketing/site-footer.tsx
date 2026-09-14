@@ -39,7 +39,7 @@ export function SiteFooter() {
         <div className="mt-12 flex flex-col gap-2 border-t border-border pt-6 text-[12px] text-muted-foreground sm:flex-row sm:items-center sm:justify-between">
           <p>&copy; {new Date().getFullYear()} LumenForge</p>
           <p>
-            Built with Next.js, Clerk, Drizzle, and Groq. Deployed on Vercel.
+            Built with Next.js, Drizzle, and Groq. Deployed on Vercel.
           </p>
         </div>
       </div>

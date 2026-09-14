@@ -28,8 +28,9 @@ export default function TermsPage() {
       <h2>Your account</h2>
       <p>
         You are responsible for what happens under your account and for keeping
-        your sign-in credentials secure. Authentication is handled by Clerk. You
-        must be old enough to enter a contract where you live.
+        your sign-in credentials secure. Passwords are hashed with scrypt, and
+        there is no password reset flow yet, so keep your own copy somewhere
+        safe. You must be old enough to enter a contract where you live.
       </p>
 
       <h2>Your data is yours</h2>

@@ -1,4 +1,4 @@
-import { auth } from "@clerk/nextjs/server";
+import { getUserId } from "@/server/helpers/session";
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Briefcase } from "lucide-react";
@@ -36,7 +36,7 @@ type Props = {
 };
 
 export default async function ProjectDetailPage({ params }: Props) {
-  const { userId } = await auth();
+  const userId = await getUserId();
   if (!userId) redirect("/sign-in");
 
   const { id } = await params;
@@ -119,7 +119,7 @@ export default async function ProjectDetailPage({ params }: Props) {
       <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <StatTile
           label="Progress"
-          value={tasks.length === 0 ? "—" : `${doneTasks}/${tasks.length}`}
+          value={tasks.length === 0 ? "â€”" : `${doneTasks}/${tasks.length}`}
           hint={
             tasks.length === 0
               ? "No tasks yet"
@@ -129,7 +129,7 @@ export default async function ProjectDetailPage({ params }: Props) {
         />
         <StatTile
           label="Budget"
-          value={project.budget ? formatMoney(project.budget) : "—"}
+          value={project.budget ? formatMoney(project.budget) : "â€”"}
           hint={project.budget ? "Agreed scope" : "Not set"}
         />
         <StatTile
@@ -144,7 +144,7 @@ export default async function ProjectDetailPage({ params }: Props) {
         />
         <StatTile
           label="Deadline"
-          value={project.dueDate ? formatDeadline(project.dueDate).replace("Due ", "") : "—"}
+          value={project.dueDate ? formatDeadline(project.dueDate).replace("Due ", "") : "â€”"}
           hint={project.dueDate ? formatDateLong(project.dueDate) : "No deadline set"}
         />
       </div>

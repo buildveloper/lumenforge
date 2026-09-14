@@ -1,4 +1,3 @@
-import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
@@ -11,17 +10,20 @@ import {
   getNotificationPreferences,
   getProfile,
 } from "@/server/actions/user";
+import { getUserId } from "@/server/helpers/session";
 
 export const metadata = { title: "Settings" };
 
 export default async function SettingsPage() {
-  const { userId } = await auth();
-  if (!userId) redirect("/sign-in");
+  if (!(await getUserId())) redirect("/sign-in");
 
   const [profile, preferences] = await Promise.all([
     getProfile(),
     getNotificationPreferences(),
   ]);
+
+  const name = profile.name ?? "Account";
+  const email = profile.email ?? "";
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -37,7 +39,7 @@ export default async function SettingsPage() {
                 Back to workspace
               </Link>
             </Button>
-            <AccountMenu collapsed />
+            <AccountMenu name={name} email={email} collapsed />
           </div>
         </div>
       </header>

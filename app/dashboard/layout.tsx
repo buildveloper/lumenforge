@@ -1,4 +1,3 @@
-import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 
 import { AppRail } from "@/components/app/app-rail";
@@ -9,21 +8,20 @@ import { TopBar } from "@/components/app/top-bar";
 import { RoleSelector } from "@/components/onboarding/role-selector";
 import { getNotifications, getUnreadCount } from "@/server/actions/notification";
 import { getProjectOptions } from "@/server/actions/project";
-import { getDashboardData } from "@/server/actions/user";
+import { getProfile } from "@/server/actions/user";
+import { getUserId } from "@/server/helpers/session";
 
 export default async function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const { userId } = await auth();
-  if (!userId) redirect("/sign-in");
+  // Defence in depth: proxy.ts bounces anonymous visitors and every action
+  // re-validates the session, but the layout must not render without one either.
+  if (!(await getUserId())) redirect("/sign-in");
 
-  // Deliberately not caught: if the user row can't be read we must fail loudly.
-  // Swallowing it fell back to role "user", which showed the role picker to
-  // existing accounts and let them silently overwrite their own role.
-  const { role } = await getDashboardData();
-  const needsRole = role === "user";
+  const profile = await getProfile();
+  const needsRole = profile.role === "user";
 
   const [projects, notifications, unreadCount] = needsRole
     ? [[], [], 0]
@@ -33,13 +31,16 @@ export default async function DashboardLayout({
         getUnreadCount(),
       ]);
 
+  const name = profile.name ?? "Account";
+  const email = profile.email ?? "";
+
   return (
     <MotionProvider features="app">
       <div className="flex min-h-screen">
-        <AppRail role={role} />
+        <AppRail role={profile.role} name={name} email={email} />
         <div className="flex min-w-0 flex-1 flex-col md:pl-60">
           <TopBar
-            role={role}
+            role={profile.role}
             projects={projects}
             notifications={notifications}
             unreadCount={unreadCount}
@@ -50,7 +51,7 @@ export default async function DashboardLayout({
         </div>
       </div>
 
-      <MobileTabBar role={role} />
+      <MobileTabBar role={profile.role} name={name} email={email} />
 
       {needsRole ? <RoleSelector /> : null}
     </MotionProvider>

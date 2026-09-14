@@ -14,7 +14,7 @@ import {
 } from "@/lib/validation";
 import { logActivity } from "@/server/helpers/log-activity";
 import { claimClientRecords, linkedClientIds } from "@/server/helpers/client-access";
-import { getClerkUser, requireUserId } from "@/server/helpers/session";
+import { requireUserId } from "@/server/helpers/session";
 
 function revalidateClients() {
   revalidatePath("/dashboard");
@@ -221,11 +221,16 @@ export async function restoreClient(input: { clientId: string }) {
  */
 export async function claimClientRecordsForCurrentUser() {
   const userId = await requireUserId();
-  const user = await getClerkUser();
-  const email = user?.primaryEmailAddress?.emailAddress;
-  if (!email) return { success: false as const, claimed: 0 };
 
-  const claimed = await claimClientRecords(userId, email);
+  const [account] = await db
+    .select({ email: users.email })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+
+  if (!account?.email) return { success: false as const, claimed: 0 };
+
+  const claimed = await claimClientRecords(userId, account.email);
   if (claimed > 0) revalidatePath("/dashboard");
 
   return { success: true as const, claimed };

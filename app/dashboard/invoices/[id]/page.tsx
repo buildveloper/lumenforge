@@ -1,4 +1,4 @@
-import { auth } from "@clerk/nextjs/server";
+import { getUserId } from "@/server/helpers/session";
 import { notFound, redirect } from "next/navigation";
 import Link from "next/link";
 import { ArrowLeft, Building2, Mail } from "lucide-react";
@@ -44,7 +44,7 @@ function DetailRow({
 }
 
 export default async function InvoiceDetailPage({ params }: Props) {
-  const { userId } = await auth();
+  const userId = await getUserId();
   if (!userId) redirect("/sign-in");
 
   const { id } = await params;

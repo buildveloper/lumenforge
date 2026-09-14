@@ -1,4 +1,4 @@
-import { auth } from "@clerk/nextjs/server";
+import { getUserId } from "@/server/helpers/session";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { ArrowRight, Briefcase } from "lucide-react";
@@ -56,7 +56,7 @@ function buildAttention({
     id: `invoice-${invoice.id}`,
     href: `/dashboard/invoices/${invoice.id}`,
     title: invoice.invoiceNumber,
-    reason: `${invoice.clientName ?? invoice.projectTitle ?? "Invoice"} · ${
+    reason: `${invoice.clientName ?? invoice.projectTitle ?? "Invoice"} Â· ${
       daysOverdue(invoice.dueDate) || 0
     } days late`,
     value: formatMoney(invoice.amount, { decimals: true }),
@@ -85,7 +85,7 @@ function buildAttention({
       id: `task-${task.id}`,
       href: task.projectId ? `/dashboard/projects/${task.projectId}` : "/dashboard/tasks",
       title: task.title,
-      reason: `${task.projectTitle ?? "No project"} · ${formatDeadline(task.dueDate)}`,
+      reason: `${task.projectTitle ?? "No project"} Â· ${formatDeadline(task.dueDate)}`,
       value: task.priority === "high" ? "High priority" : "Task",
       tone: "signal" as const,
     }));
@@ -94,7 +94,7 @@ function buildAttention({
 }
 
 export default async function DashboardPage() {
-  const { userId } = await auth();
+  const userId = await getUserId();
   if (!userId) redirect("/sign-in");
 
   const profile = await getProfile();
@@ -135,7 +135,7 @@ export default async function DashboardPage() {
     attention.length > 0 ? `${attention.length} needing attention` : null,
   ]
     .filter(Boolean)
-    .join(" · ");
+    .join(" Â· ");
 
   const counterparty = counterparties[0]?.name ?? null;
 
@@ -145,7 +145,7 @@ export default async function DashboardPage() {
         title={isClient ? "Your projects" : "Overview"}
         description={
           isClient && counterparty
-            ? `Working with ${counterparty} · ${state}`
+            ? `Working with ${counterparty} Â· ${state}`
             : state
         }
         actions={
@@ -207,7 +207,7 @@ export default async function DashboardPage() {
               ? `${dueThisWeek} task${dueThisWeek === 1 ? "" : "s"} due this week`
               : "Contacts in your directory"
           }
-          tone={isClient ? "positive" : "default"}
+          tone={isClient && summary.collected > 0 ? "positive" : "default"}
           href={isClient ? "/dashboard/invoices?status=paid" : "/dashboard/clients"}
         />
       </div>

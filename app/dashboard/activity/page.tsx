@@ -1,4 +1,4 @@
-import { auth } from "@clerk/nextjs/server";
+import { getUserId } from "@/server/helpers/session";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 
@@ -10,7 +10,7 @@ import { getUnreadCount } from "@/server/actions/notification";
 import { getProfile } from "@/server/actions/user";
 
 export default async function ActivityPage() {
-  const { userId } = await auth();
+  const userId = await getUserId();
   if (!userId) redirect("/sign-in");
 
   const profile = await getProfile();

@@ -15,7 +15,7 @@ pricing should read that way.
 - **Language**: TypeScript (strict)
 - **Styling**: Tailwind CSS v4 + shadcn/ui + `@tailwindcss/typography`
 - **Motion**: `motion` (v13) via `LazyMotion`, split by route group
-- **Auth**: Clerk
+- **Auth**: built in — email + password, scrypt hashing, DB-backed sessions
 - **Database**: Drizzle ORM + libSQL (local SQLite file, Turso in production)
 - **AI**: Groq (`llama-3.3-70b-versatile`), streamed through a route handler
 - **Deployment**: Vercel
@@ -87,11 +87,14 @@ server/helpers/        session, client-access, ai-context, log-activity
 - Proper TypeScript. No `any`.
 - Actions return `{ success: true, ... }` or throw. They do not return a
   `{ success: false, error }` envelope — callers catch.
-- Identity comes from `server/helpers/session.ts`, which wraps the Clerk lookup
-  and the role read in React `cache()` so a page load issues one query, not
-  twelve. Do not call `auth()` directly in an action.
+- Identity comes from `server/helpers/session.ts`, which wraps the session lookup
+  in React `cache()` so a page load issues one query, not twelve. Never store a
+  raw session token: only its SHA-256 goes in the database.
+- `proxy.ts` is a cookie presence check and rate limiter, never the
+  authorization boundary. Every page and action re-validates through
+  `requireUserId()`.
 - Client-scoped reads resolve through `server/helpers/client-access.ts`. Never
-  compare a `clients.id` against a Clerk user id.
+  compare a `clients.id` against a user id.
 - `revalidatePath` (or `revalidateTag`) after every mutation.
 - Names describe the action: `createProject`, `getUserProjects`, `restoreInvoice`.
 
@@ -107,9 +110,20 @@ server/helpers/        session, client-access, ai-context, log-activity
 ## Deliberately not built
 
 Do not imply any of these exist: online payment collection (Stripe), PDF invoice
-export, outbound email, realtime updates, file attachments, time tracking,
-multi-tenant/agency support, or an `/admin` surface. The `sessions` and
-`api_keys` tables are unused scaffolding.
+export, outbound email, **email verification, password reset**, realtime updates,
+file attachments, time tracking, multi-tenant/agency support, or an `/admin`
+surface. The `api_keys` table is unused scaffolding.
+
+There is no email verification and no password reset, because neither is
+possible without an email provider. The sign-up page says so rather than
+pretending otherwise.
+
+## One deliberate exception
+
+Auth actions return `{ ok: false, error }` instead of throwing. A wrong password
+is an expected outcome that needs a specific message, and Next redacts thrown
+error messages from Server Actions in production. Every other action follows the
+throw-or-`{ success: true }` rule.
 
 ## Known environment notes
 

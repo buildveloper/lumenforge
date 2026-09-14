@@ -1,21 +1,16 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { auth } from "@clerk/nextjs/server";
 import { eq, desc, and, count } from "drizzle-orm";
+
 import { db } from "@/lib/db";
 import { notifications } from "@/db/schema";
-
-async function getUserId(): Promise<string> {
-  const { userId } = await auth();
-  if (!userId) throw new Error("Unauthorized");
-  return userId;
-}
+import { requireUserId } from "@/server/helpers/session";
 
 // -- Get notifications ---------------------------------------------------------
 
 export async function getNotifications(limit = 20) {
-  const userId = await getUserId();
+  const userId = await requireUserId();
 
   return db
     .select()
@@ -28,7 +23,7 @@ export async function getNotifications(limit = 20) {
 // -- Get unread count ----------------------------------------------------------
 
 export async function getUnreadCount() {
-  const userId = await getUserId();
+  const userId = await requireUserId();
 
   const [result] = await db
     .select({ value: count() })
@@ -43,7 +38,7 @@ export async function getUnreadCount() {
 // -- Mark as read --------------------------------------------------------------
 
 export async function markAsRead(notificationId: string) {
-  const userId = await getUserId();
+  const userId = await requireUserId();
 
   const [notification] = await db
     .select({ userId: notifications.userId })
@@ -65,7 +60,7 @@ export async function markAsRead(notificationId: string) {
 // -- Mark all as read ----------------------------------------------------------
 
 export async function markAllAsRead() {
-  const userId = await getUserId();
+  const userId = await requireUserId();
 
   await db
     .update(notifications)

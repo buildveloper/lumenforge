@@ -26,7 +26,15 @@ const spring = { type: "spring" as const, stiffness: 400, damping: 32 };
  * Primary destinations live in the bottom 25% of the screen, inside one-handed
  * reach. Everything else moves into the sheet behind "More".
  */
-export function MobileTabBar({ role }: { role: string }) {
+export function MobileTabBar({
+  role,
+  name,
+  email,
+}: {
+  role: string;
+  name: string;
+  email: string;
+}) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
 
@@ -121,7 +129,7 @@ export function MobileTabBar({ role }: { role: string }) {
           </div>
 
           <div className="mt-4 px-3">
-            <AccountMenu />
+            <AccountMenu name={name} email={email} />
           </div>
         </SheetContent>
       </Sheet>

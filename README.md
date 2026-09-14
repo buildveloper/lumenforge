@@ -40,7 +40,7 @@ they can log into. Clients stop asking for updates; you stop writing them.
 | Language | [TypeScript](https://www.typescriptlang.org) — strict |
 | Styling | [Tailwind CSS v4](https://tailwindcss.com) + [shadcn/ui](https://ui.shadcn.com) + `@tailwindcss/typography` |
 | Motion | [`motion`](https://motion.dev) v13, via `LazyMotion`, split by route group |
-| Auth | [Clerk](https://clerk.com) |
+| Auth | Built in — email + password, scrypt hashing, DB-backed sessions |
 | Database | [Drizzle ORM](https://orm.drizzle.team) + libSQL ([Turso](https://turso.tech) in production) |
 | AI | [Groq](https://groq.com) — `llama-3.3-70b-versatile`, streamed through a route handler |
 | Drag & drop | [`@dnd-kit`](https://dndkit.com) with a keyboard sensor |
@@ -67,10 +67,11 @@ status glyph-plus-label systems so meaning never depends on colour alone.
 ### Prerequisites
 
 - **Node.js** 20+
-- A **Clerk** account — [dashboard.clerk.com](https://dashboard.clerk.com)
 - A libSQL database — a local SQLite file is fine, or [Turso](https://turso.tech)
 - A **Groq** API key — [console.groq.com](https://console.groq.com) (optional;
   the AI panel shows an honest "not configured" state without it)
+
+No third-party auth account is needed. Sign-in is part of the app.
 
 ### 1. Install
 
@@ -91,8 +92,6 @@ cp .env.example .env
 
 | Variable | Required | Notes |
 |---|---|---|
-| `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | yes | Clerk dashboard |
-| `CLERK_SECRET_KEY` | yes | Clerk dashboard |
 | `TURSO_DATABASE_URL` | yes | `file:./data/lumenforge.db` locally |
 | `TURSO_AUTH_TOKEN` | in production | Empty for local SQLite |
 | `GROQ_API_KEY` | no | AI features are disabled without it |
@@ -153,14 +152,34 @@ the only place that maps a signed-in account to a client record.
 
 ## Not built
 
-Stated plainly rather than implied: **no online payment collection**, no PDF
-invoice export, no outbound email, no realtime updates, no file attachments, no
-time tracking, no multi-tenant or agency support, and no `/admin` surface.
-Invoices track what is owed and what has been paid; collecting the money still
-happens wherever you already do it.
+Stated plainly rather than implied: **no email verification**, **no password
+reset**, **no online payment collection**, no PDF invoice export, no outbound
+email, no realtime updates, no file attachments, no time tracking, no
+multi-tenant or agency support, and no `/admin` surface.
 
-The `sessions` and `api_keys` tables exist in the schema but nothing reads or
-writes them.
+Email verification and password reset are both missing for the same reason:
+there is no email provider. Adding one is the prerequisite for either, and
+faking it would be worse than not having it. The sign-up page says so.
+
+Invoices track what is owed and what has been paid; collecting the money still
+happens wherever you already do it. The `api_keys` table is unused scaffolding.
+
+## Authentication
+
+Built in, with no third-party identity provider.
+
+- **Passwords** are hashed with scrypt from `node:crypto` using a per-account
+  salt. The cost parameters are stored alongside each hash, so they can be
+  raised later without invalidating existing accounts.
+- **Sessions** are rows in the `sessions` table, so signing out invalidates
+  immediately rather than waiting for a cookie to expire. Only the SHA-256 of a
+  token is stored: a database leak does not hand over usable sessions.
+- **Cookies** are `httpOnly`, `SameSite=Lax`, and `Secure` in production.
+- **Sign-in** does not reveal whether an email is registered — a missing account
+  and a wrong password return the same message and take the same time.
+- **Brute force** is throttled per account, on top of the per-IP limit in
+  `proxy.ts`.
+- **Changing a password** signs out every other device.
 
 ---
 
@@ -169,8 +188,7 @@ writes them.
 1. Push to GitHub and import the project in Vercel.
 2. Add every environment variable from the table above.
 3. Set `TURSO_DATABASE_URL` and `TURSO_AUTH_TOKEN` to your production database.
-4. Rotate the Clerk keys to the production instance.
-5. `npm run db:migrate` against the production database.
+4. `npm run db:migrate` against the production database.
 
 ---
 

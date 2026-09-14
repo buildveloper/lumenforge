@@ -1,4 +1,4 @@
-import { auth } from "@clerk/nextjs/server";
+import { getUserId } from "@/server/helpers/session";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { X } from "lucide-react";
@@ -15,7 +15,7 @@ export default async function ProjectsPage({
 }: {
   searchParams: Promise<{ new?: string; client?: string }>;
 }) {
-  const { userId } = await auth();
+  const userId = await getUserId();
   if (!userId) redirect("/sign-in");
 
   const profile = await getProfile();

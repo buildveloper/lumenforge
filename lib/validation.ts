@@ -20,8 +20,45 @@ const LONG = 2000;
 
 export const paginationSchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
-  limit: z.coerce.number().int().min(1).max(50).default(12),
+  // 100 rather than 50: the list pages ask for 60 so a full board or ledger
+  // arrives in one request. The bound exists to stop a hand-rolled request
+  // asking for everything at once.
+  limit: z.coerce.number().int().min(1).max(100).default(12),
 });
+
+// -- Auth ---------------------------------------------------------------------
+
+/**
+ * Length is the only rule worth enforcing. Composition requirements push people
+ * toward predictable substitutions; a long passphrase is stronger and easier to
+ * remember. The upper bound exists because scrypt hashes whatever it is given.
+ */
+export const passwordSchema = z
+  .string()
+  .min(10, "Use at least 10 characters.")
+  .max(200, "That password is too long.");
+
+export const signUpSchema = z.object({
+  name: requiredString.max(120),
+  email: email,
+  password: passwordSchema,
+});
+
+export const signInSchema = z.object({
+  email: email,
+  // Deliberately not `passwordSchema`: never tell a sign-in attempt that the
+  // password it guessed was the wrong *shape*.
+  password: z.string().min(1).max(200),
+});
+
+export const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1).max(200),
+  newPassword: passwordSchema,
+});
+
+export type SignUpInput = z.infer<typeof signUpSchema>;
+export type SignInInput = z.infer<typeof signInSchema>;
+export type ChangePasswordInput = z.infer<typeof changePasswordSchema>;
 
 // -- Role ---------------------------------------------------------------------
 

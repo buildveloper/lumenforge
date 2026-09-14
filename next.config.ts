@@ -1,16 +1,25 @@
 import type { NextConfig } from "next";
 
+const isDev = process.env.NODE_ENV !== "production";
+
+/**
+ * Clerk and Cloudflare left this list along with the dependency, so the policy
+ * is now `self` and nothing else. `unsafe-eval` is granted only in development,
+ * where the bundler's runtime needs it.
+ */
 const csp = [
   "default-src 'self'",
-  "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://*.clerk.accounts.dev https://challenges.cloudflare.com",
-  "style-src 'self' 'unsafe-inline' https://*.clerk.accounts.dev",
-  "img-src 'self' data: blob: https://img.clerk.com https://*.clerk.accounts.dev",
-  "font-src 'self' https://*.clerk.accounts.dev",
-  "connect-src 'self' https://*.clerk.accounts.dev https://*.ingest.sentry.io",
-  "frame-src 'self' https://challenges.cloudflare.com https://*.clerk.accounts.dev",
+  isDev
+    ? "script-src 'self' 'unsafe-inline' 'unsafe-eval'"
+    : "script-src 'self' 'unsafe-inline'",
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' data: blob:",
+  "font-src 'self'",
+  "connect-src 'self'",
+  "frame-src 'none'",
   "object-src 'none'",
   "base-uri 'self'",
-  "form-action 'self' https://*.clerk.accounts.dev",
+  "form-action 'self'",
 ].join("; ");
 
 const nextConfig: NextConfig = {

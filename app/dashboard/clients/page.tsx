@@ -1,4 +1,4 @@
-import { auth } from "@clerk/nextjs/server";
+import { getUserId } from "@/server/helpers/session";
 import { redirect } from "next/navigation";
 
 import { PageHeader, PageShell } from "@/components/app/page-shell";
@@ -14,7 +14,7 @@ export default async function ClientsPage({
 }: {
   searchParams: Promise<{ new?: string }>;
 }) {
-  const { userId } = await auth();
+  const userId = await getUserId();
   if (!userId) redirect("/sign-in");
 
   const profile = await getProfile();
@@ -38,7 +38,7 @@ export default async function ClientsPage({
             ? "Everyone you do work for, with what they owe and what is in flight."
             : `${clients.length} client${clients.length === 1 ? "" : "s"}${
                 needsPortal > 0
-                  ? ` · ${needsPortal} yet to claim portal access`
+                  ? ` Â· ${needsPortal} yet to claim portal access`
                   : ""
               }`
         }

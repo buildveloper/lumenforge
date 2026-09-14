@@ -1,10 +1,10 @@
 "use client";
 
-import { useClerk, useUser } from "@clerk/nextjs";
-import { ChevronsUpDown, LogOut, Settings, UserRound } from "lucide-react";
+import { useState } from "react";
+import { ChevronsUpDown, LogOut, Settings } from "lucide-react";
 import Link from "next/link";
 
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -14,17 +14,26 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { formatInitials } from "@/lib/format";
+import { signOut } from "@/server/actions/auth";
 
-/**
- * Clerk's <UserButton /> ships its own popover styling that can't be themed to
- * match, so the account menu is ours: same actions, same design system.
- */
-export function AccountMenu({ collapsed = false }: { collapsed?: boolean }) {
-  const { user, isLoaded } = useUser();
-  const clerk = useClerk();
+export function AccountMenu({
+  name,
+  email,
+  collapsed = false,
+}: {
+  name: string;
+  email: string;
+  collapsed?: boolean;
+}) {
+  const [pending, setPending] = useState(false);
 
-  const name = user?.fullName ?? user?.username ?? "Account";
-  const email = user?.primaryEmailAddress?.emailAddress ?? "";
+  async function handleSignOut() {
+    setPending(true);
+    await signOut();
+    // A hard navigation, so every cached render is discarded along with the
+    // session rather than being reused with stale privileged data in it.
+    window.location.assign("/");
+  }
 
   return (
     <DropdownMenu>
@@ -33,20 +42,15 @@ export function AccountMenu({ collapsed = false }: { collapsed?: boolean }) {
         aria-label="Account menu"
       >
         <Avatar>
-          {user?.imageUrl ? <AvatarImage src={user.imageUrl} alt="" /> : null}
-          <AvatarFallback>
-            {isLoaded ? formatInitials(name) : ""}
-          </AvatarFallback>
+          <AvatarFallback>{formatInitials(name)}</AvatarFallback>
         </Avatar>
         {collapsed ? null : (
           <>
             <span className="min-w-0 flex-1">
               <span className="block truncate text-[13px] font-medium">{name}</span>
-              {email ? (
-                <span className="block truncate text-[11px] text-muted-foreground">
-                  {email}
-                </span>
-              ) : null}
+              <span className="block truncate text-[11px] text-muted-foreground">
+                {email}
+              </span>
             </span>
             <ChevronsUpDown className="size-3.5 shrink-0 text-muted-foreground" />
           </>
@@ -55,7 +59,7 @@ export function AccountMenu({ collapsed = false }: { collapsed?: boolean }) {
 
       <DropdownMenuContent align="start" side="top" className="w-60">
         <DropdownMenuLabel className="truncate font-normal text-muted-foreground">
-          {email || name}
+          {email}
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuItem asChild>
@@ -64,17 +68,16 @@ export function AccountMenu({ collapsed = false }: { collapsed?: boolean }) {
             Account settings
           </Link>
         </DropdownMenuItem>
-        <DropdownMenuItem onSelect={() => clerk.openUserProfile()}>
-          <UserRound />
-          Manage profile
-        </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem
           tone="danger"
-          onSelect={() => clerk.signOut({ redirectUrl: "/" })}
+          disabled={pending}
+          onSelect={() => {
+            void handleSignOut();
+          }}
         >
           <LogOut />
-          Sign out
+          {pending ? "Signing out…" : "Sign out"}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

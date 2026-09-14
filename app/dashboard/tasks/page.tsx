@@ -1,4 +1,4 @@
-import { auth } from "@clerk/nextjs/server";
+import { getUserId } from "@/server/helpers/session";
 import { redirect } from "next/navigation";
 
 import { PageHeader, PageShell } from "@/components/app/page-shell";
@@ -13,7 +13,7 @@ export default async function TasksPage({
 }: {
   searchParams: Promise<{ new?: string }>;
 }) {
-  const { userId } = await auth();
+  const userId = await getUserId();
   if (!userId) redirect("/sign-in");
 
   const profile = await getProfile();
@@ -39,7 +39,7 @@ export default async function TasksPage({
         description={
           tasks.length === 0
             ? "Every task across every project, in one list."
-            : `${open} open of ${tasks.length}${late > 0 ? ` · ${late} overdue` : ""}`
+            : `${open} open of ${tasks.length}${late > 0 ? ` Â· ${late} overdue` : ""}`
         }
         actions={
           isClient ? null : (

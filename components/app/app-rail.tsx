@@ -49,7 +49,15 @@ function NewMenu() {
  * The rail's active state glides between items with a shared layout animation
  * rather than snapping a background on and off.
  */
-export function AppRail({ role }: { role: string }) {
+export function AppRail({
+  role,
+  name,
+  email,
+}: {
+  role: string;
+  name: string;
+  email: string;
+}) {
   const pathname = usePathname();
   const items = navItemsForRole(role);
   const canCreate = role === "freelancer" || role === "user" || role === "admin";
@@ -98,7 +106,7 @@ export function AppRail({ role }: { role: string }) {
       </nav>
 
       <div className="shrink-0 border-t border-border p-2">
-        <AccountMenu />
+        <AccountMenu name={name} email={email} />
       </div>
     </aside>
   );
