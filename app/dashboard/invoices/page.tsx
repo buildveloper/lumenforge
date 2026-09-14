@@ -1,62 +1,105 @@
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
-import { Receipt } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
-import { InvoiceCard } from "@/components/dashboard/invoice-card";
-import { InvoicesClient } from "./invoices-client";
-import { InvoiceFilters } from "./invoice-filters";
+
+import { FilterLinks } from "@/components/app/filter-links";
+import { Num } from "@/components/app/num";
+import { PageHeader, PageShell } from "@/components/app/page-shell";
+import {
+  InvoicesTable,
+  NewInvoiceButton,
+} from "@/components/dashboard/invoices-view";
+import { formatMoney } from "@/lib/format";
+import { getClientOptions } from "@/server/actions/client";
 import { getUserInvoices } from "@/server/actions/invoice";
+import { getProjectOptions } from "@/server/actions/project";
+import { getProfile } from "@/server/actions/user";
 
-type Props = {
-  searchParams: Promise<{ status?: string }>;
-};
-
-export default async function InvoicesPage({ searchParams }: Props) {
+export default async function InvoicesPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ status?: string; new?: string }>;
+}) {
   const { userId } = await auth();
   if (!userId) redirect("/sign-in");
 
-  const { status } = await searchParams;
-  const { invoices, total } = await getUserInvoices(status ?? "all", {
-    page: 1,
-    limit: 50,
-  });
+  const profile = await getProfile();
+  if (profile.role === "user") return null;
+
+  const isClient = profile.role === "client";
+  const params = await searchParams;
+
+  const [data, clients, projects] = await Promise.all([
+    getUserInvoices(params.status, { page: 1, limit: 50 }),
+    isClient ? Promise.resolve([]) : getClientOptions(),
+    isClient ? Promise.resolve([]) : getProjectOptions(),
+  ]);
+
+  const shownTotal = data.invoices.reduce(
+    (sum, invoice) => sum + invoice.amount,
+    0
+  );
+  const activeFilter = params.status ?? "all";
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6 lg:px-8">
-      <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
-            Invoices
-          </h1>
-          <p className="mt-1 text-muted-foreground">
-            {total} invoice{total !== 1 ? "s" : ""}
-          </p>
-        </div>
-        <InvoicesClient />
+    <PageShell>
+      <PageHeader
+        title="Invoices"
+        description={
+          data.counts.all === 0
+            ? "Raise an invoice and it is numbered from your own sequence."
+            : `${data.counts.all} invoice${data.counts.all === 1 ? "" : "s"}${
+                data.counts.overdue
+                  ? ` · ${data.counts.overdue} overdue`
+                  : ""
+              }`
+        }
+        actions={
+          isClient ? null : (
+            <NewInvoiceButton
+              initialOpen={params.new === "1"}
+              clients={clients.map((client) => ({
+                id: client.id,
+                label: client.company
+                  ? `${client.name} · ${client.company}`
+                  : client.name,
+              }))}
+              projects={projects.map((project) => ({
+                id: project.id,
+                label: project.title,
+              }))}
+            />
+          )
+        }
+      />
+
+      <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <FilterLinks
+          basePath="/dashboard/invoices"
+          current={activeFilter}
+          options={[
+            { value: "all", label: "All", count: data.counts.all },
+            { value: "draft", label: "Draft", count: data.counts.draft },
+            { value: "sent", label: "Sent", count: data.counts.sent },
+            { value: "paid", label: "Paid", count: data.counts.paid },
+            { value: "overdue", label: "Overdue", count: data.counts.overdue },
+          ]}
+        />
+
+        {data.invoices.length > 0 ? (
+          <Num className="shrink-0 text-[12px] text-muted-foreground">
+            Showing {formatMoney(shownTotal, { decimals: true })}
+          </Num>
+        ) : null}
       </div>
 
-      <InvoiceFilters currentStatus={status} />
-
-      {invoices.length === 0 ? (
-        <Card className="border-dashed border-border/60 bg-muted/20">
-          <CardContent className="flex flex-col items-center justify-center py-16 text-center">
-            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10 mb-6">
-              <Receipt className="h-8 w-8 text-primary" />
-            </div>
-            <h2 className="text-xl font-semibold mb-2">No invoices yet</h2>
-            <p className="text-muted-foreground mb-8 max-w-sm">
-              Create your first invoice to start getting paid.
-            </p>
-            <InvoicesClient />
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="space-y-3">
-          {invoices.map((invoice) => (
-            <InvoiceCard key={invoice.id} invoice={invoice} />
-          ))}
-        </div>
-      )}
-    </div>
+      <InvoicesTable
+        invoices={data.invoices}
+        emptyDescription={
+          activeFilter === "all"
+            ? undefined
+            : `Nothing is ${activeFilter} right now. That is the state you want for draft and overdue.`
+        }
+      />
+    </PageShell>
   );
 }

@@ -1,23 +1,35 @@
 import { auth } from "@clerk/nextjs/server";
-import { redirect, notFound } from "next/navigation";
-import { ArrowLeft, Calendar, DollarSign, Pencil, Briefcase, Receipt } from "lucide-react";
+import { notFound, redirect } from "next/navigation";
+import Link from "next/link";
+import { ArrowLeft, Briefcase } from "lucide-react";
+
+import { ActivityFeed } from "@/components/app/activity-feed";
+import { Breadcrumbs } from "@/components/app/breadcrumbs";
+import { EmptyState } from "@/components/app/empty-state";
+import { Num } from "@/components/app/num";
+import { PageShell } from "@/components/app/page-shell";
+import { StatTile } from "@/components/app/stat-tile";
+import { StatusChip } from "@/components/app/status-chip";
+import { AIAssistant } from "@/components/ai/ai-assistant";
+import { QuickAIActions } from "@/components/ai/quick-ai-actions";
+import { InvoiceCard } from "@/components/dashboard/invoice-card";
+import { NewInvoiceButton } from "@/components/dashboard/invoices-view";
+import { EditProjectButton } from "@/components/dashboard/new-project-button";
+import { ProjectDecision } from "@/components/dashboard/project-decision";
+import { KanbanBoard } from "@/components/kanban/kanban-board";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import Link from "next/link";
-import { ProjectDetailClient } from "./project-detail-client";
-import { Breadcrumbs } from "@/components/dashboard/breadcrumbs";
-import { getProjectById } from "@/server/actions/project";
-import { getProjectTasks } from "@/server/actions/task";
+import { formatDateLong, formatDeadline, formatMoney } from "@/lib/format";
+import { getClientOptions } from "@/server/actions/client";
 import { getProjectInvoices } from "@/server/actions/invoice";
-import { KanbanBoard } from "@/components/kanban/kanban-board";
-import { InvoicesClient } from "@/app/dashboard/invoices/invoices-client";
-import { InvoiceCard } from "@/components/dashboard/invoice-card";
-import { AIAssistant } from "@/components/ai/ai-assistant";
-import { getDashboardData } from "@/server/actions/user";
-import { QuickAIActions } from "@/components/ai/quick-ai-actions";
+import {
+  getLatestProjectDecision,
+  getProjectActivity,
+  getProjectById,
+} from "@/server/actions/project";
+import { getProjectTasks } from "@/server/actions/task";
+import { getProfile } from "@/server/actions/user";
 
 type Props = {
   params: Promise<{ id: string }>;
@@ -28,6 +40,10 @@ export default async function ProjectDetailPage({ params }: Props) {
   if (!userId) redirect("/sign-in");
 
   const { id } = await params;
+  const profile = await getProfile();
+  if (profile.role === "user") return null;
+
+  const isClient = profile.role === "client";
 
   let project;
   try {
@@ -36,223 +52,204 @@ export default async function ProjectDetailPage({ params }: Props) {
     notFound();
   }
 
-  const clientName = project.clientName ?? project.clientCompany ?? "No client";
-  const budgetDisplay = project.budget
-    ? `$${(project.budget / 100).toLocaleString()}`
-    : null;
-  const dueDateDisplay = project.dueDate
-    ? new Date(project.dueDate).toLocaleDateString("en-US", {
-        year: "numeric",
-        month: "long",
-        day: "numeric",
-      })
-    : null;
+  const [tasks, invoices, activity, decision, clients] = await Promise.all([
+    getProjectTasks(id),
+    getProjectInvoices(id),
+    getProjectActivity(id),
+    getLatestProjectDecision(id),
+    isClient ? Promise.resolve([]) : getClientOptions(),
+  ]);
 
-  const projectTasks = await getProjectTasks(id);
-  const projectInvoices = await getProjectInvoices(id);
-  const { role } = await getDashboardData();
+  const doneTasks = tasks.filter((task) => task.status === "done").length;
+  const party = project.clientName ?? project.clientCompany ?? "No client";
+  const outstanding = invoices
+    .filter((invoice) => invoice.status === "sent" || invoice.status === "overdue")
+    .reduce((sum, invoice) => sum + invoice.amount, 0);
 
   return (
-    <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6">
+    <PageShell>
       <Breadcrumbs
         items={[
-          { label: "Dashboard", href: "/dashboard" },
+          { label: "Workspace", href: "/dashboard" },
           { label: "Projects", href: "/dashboard/projects" },
           { label: project.title },
         ]}
       />
 
-      {/* -- Back + Edit ------------------------------------------ */}
-      <div className="flex items-center justify-between mb-6">
-        <Button variant="ghost" size="sm" className="gap-2" asChild>
-          <Link href="/dashboard/projects">
-            <ArrowLeft className="h-4 w-4" />
-            All Projects
-          </Link>
-        </Button>
-        <ProjectDetailClient project={project} role={role} />
-      </div>
-
-      {/* -- Project Header --------------------------------------- */}
-      <div className="mb-8">
-        <div className="flex items-start gap-4">
-          <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 shrink-0">
-            <Briefcase className="h-6 w-6 text-primary" />
-          </div>
-          <div className="min-w-0 flex-1">
-            <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
+      <div className="mt-4 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex min-w-0 items-start gap-3">
+          <span className="mt-0.5 grid size-9 shrink-0 place-items-center rounded-md border border-border bg-surface-sunken text-muted-foreground">
+            <Briefcase className="size-4" />
+          </span>
+          <div className="min-w-0">
+            <h1 className="text-xl font-semibold tracking-[-0.02em] sm:text-2xl">
               {project.title}
             </h1>
-            <div className="flex flex-wrap items-center gap-3 mt-3">
-              <StatusBadge status={project.status} />
-              <span className="text-sm text-muted-foreground">
-                {clientName}
+            <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-2">
+              <StatusChip status={project.status} />
+              <span className="text-[13px] text-muted-foreground">{party}</span>
+              <span className="text-[13px] text-muted-foreground">
+                {formatDeadline(project.dueDate)}
               </span>
             </div>
           </div>
         </div>
 
-        {/* -- Quick stats ------------------------------------- */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-6">
-          {budgetDisplay && (
-            <div className="flex items-center gap-2 rounded-lg border border-border/40 bg-card/50 px-4 py-3">
-              <DollarSign className="h-4 w-4 text-primary" />
-              <div>
-                <p className="text-xs text-muted-foreground">Budget</p>
-                <p className="text-sm font-semibold">{budgetDisplay}</p>
-              </div>
-            </div>
+        <div className="shrink-0">
+          {isClient ? (
+            <ProjectDecision projectId={id} decision={decision} />
+          ) : (
+            <EditProjectButton
+              clients={clients}
+              label="Edit project"
+              project={{
+                id: project.id,
+                title: project.title,
+                description: project.description,
+                status: project.status,
+                budget: project.budget,
+                dueDate: project.dueDate,
+                clientId: project.clientId,
+              }}
+            />
           )}
-          {dueDateDisplay && (
-            <div className="flex items-center gap-2 rounded-lg border border-border/40 bg-card/50 px-4 py-3">
-              <Calendar className="h-4 w-4 text-primary" />
-              <div>
-                <p className="text-xs text-muted-foreground">Deadline</p>
-                <p className="text-sm font-semibold">{dueDateDisplay}</p>
-              </div>
-            </div>
-          )}
-          <div className="flex items-center gap-2 rounded-lg border border-border/40 bg-card/50 px-4 py-3">
-            <Briefcase className="h-4 w-4 text-primary" />
-            <div>
-              <p className="text-xs text-muted-foreground">Client</p>
-              <p className="text-sm font-semibold truncate max-w-[120px]">
-                {clientName}
-              </p>
-            </div>
-          </div>
         </div>
       </div>
 
-      <Separator className="mb-8" />
+      <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <StatTile
+          label="Progress"
+          value={tasks.length === 0 ? "—" : `${doneTasks}/${tasks.length}`}
+          hint={
+            tasks.length === 0
+              ? "No tasks yet"
+              : `${Math.round((doneTasks / tasks.length) * 100)}% complete`
+          }
+          tone={tasks.length > 0 && doneTasks === tasks.length ? "positive" : "default"}
+        />
+        <StatTile
+          label="Budget"
+          value={project.budget ? formatMoney(project.budget) : "—"}
+          hint={project.budget ? "Agreed scope" : "Not set"}
+        />
+        <StatTile
+          label="Outstanding"
+          value={formatMoney(outstanding)}
+          hint={
+            invoices.length === 0
+              ? "No invoices yet"
+              : `${invoices.length} invoice${invoices.length === 1 ? "" : "s"}`
+          }
+          tone={outstanding > 0 ? "signal" : "default"}
+        />
+        <StatTile
+          label="Deadline"
+          value={project.dueDate ? formatDeadline(project.dueDate).replace("Due ", "") : "—"}
+          hint={project.dueDate ? formatDateLong(project.dueDate) : "No deadline set"}
+        />
+      </div>
 
-      {/* -- Tabs -------------------------------------------------- */}
-      <Tabs defaultValue="overview">
-        <TabsList className="w-full justify-start border-b border-border/40 rounded-none bg-transparent h-auto p-0 mb-8">
-          <TabTrigger value="overview" label="Overview" />
-          <TabTrigger value="tasks" label="Tasks" />
-          <TabTrigger value="invoices" label="Invoices" />
-          <TabTrigger value="activity" label="Activity" />
-          <TabTrigger value="ai" label="AI Assistant" />
+      <Tabs defaultValue="overview" className="mt-6">
+        <TabsList className="sticky top-14 z-10 -mx-4 overflow-x-auto bg-background/95 px-4 backdrop-blur-md sm:-mx-6 sm:px-6 scroll-thin">
+          <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="tasks">Tasks</TabsTrigger>
+          <TabsTrigger value="invoices">Invoices</TabsTrigger>
+          <TabsTrigger value="activity">Activity</TabsTrigger>
+          <TabsTrigger value="ai">AI Assistant</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="overview" className="mt-0">
+        <TabsContent value="overview">
           {project.description ? (
-            <Card className="border-border/40 bg-card/50">
-              <CardHeader>
-                <CardTitle className="text-lg">Description</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-muted-foreground leading-relaxed whitespace-pre-wrap">
-                  {project.description}
-                </p>
-              </CardContent>
-            </Card>
+            <div className="max-w-2xl">
+              <p className="whitespace-pre-wrap text-[14px] leading-6 text-muted-foreground">
+                {project.description}
+              </p>
+            </div>
           ) : (
-            <Card className="border-dashed border-border/60 bg-muted/20">
-              <CardContent className="flex flex-col items-center justify-center py-12 text-center">
-                <Pencil className="h-8 w-8 text-muted-foreground mb-3" />
-                <h3 className="text-lg font-medium mb-1">No description</h3>
-                <p className="text-sm text-muted-foreground">
-                  Add a description to give context about this project.
-                </p>
-              </CardContent>
-            </Card>
+            <EmptyState
+              title="No scope written down"
+              description={
+                isClient
+                  ? "Your freelancer hasn't added a description to this project yet."
+                  : "Describe what you're delivering and what is out of scope. It gives the AI something to work from and settles arguments later."
+              }
+            />
           )}
 
-          <div className="mt-6 flex gap-3">
-            <ProjectDetailClient project={project} role={role} />
-          </div>
-
-          <div className="mt-8">
-            <QuickAIActions projectId={id} />
-          </div>
+          {isClient ? null : (
+            <div className="mt-8">
+              <QuickAIActions projectId={id} />
+            </div>
+          )}
         </TabsContent>
 
-        <TabsContent value="tasks" className="mt-0">
-          <KanbanBoard projectId={id} tasks={projectTasks} showCreate={role === "freelancer"} />
+        <TabsContent value="tasks">
+          <KanbanBoard
+            projectId={id}
+            tasks={tasks}
+            showCreate={!isClient}
+          />
         </TabsContent>
 
-        <TabsContent value="invoices" className="mt-0">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-lg font-semibold">Invoices</h2>
-            <InvoicesClient projectId={id} showCreate={role === "freelancer"} />
+        <TabsContent value="invoices">
+          <div className="mb-4 flex items-center justify-between gap-3">
+            <h2 className="text-[13px] font-semibold">
+              {invoices.length === 0
+                ? "Invoices"
+                : `${invoices.length} invoice${invoices.length === 1 ? "" : "s"}`}
+            </h2>
+            <NewInvoiceButton projectId={id} />
           </div>
-          {projectInvoices.length === 0 ? (
-            <Card className="border-dashed border-border/60 bg-muted/20">
-              <CardContent className="flex flex-col items-center justify-center py-12 text-center">
-                <Receipt className="h-8 w-8 text-muted-foreground mb-3" />
-                <h3 className="text-lg font-medium mb-1">No invoices yet</h3>
-                <p className="text-sm text-muted-foreground mb-4">
-                  Create an invoice for this project to get started.
-                </p>
-                <InvoicesClient projectId={id} showCreate={role === "freelancer"} />
-              </CardContent>
-            </Card>
+
+          {invoices.length === 0 ? (
+            <EmptyState
+              title="No invoices yet"
+              description={
+                isClient
+                  ? "Invoices your freelancer raises for this project will appear here."
+                  : "Raise an invoice for this project and it gets a number automatically."
+              }
+            />
           ) : (
-            <div className="space-y-3">
-              {projectInvoices.map((inv) => (
-                <InvoiceCard key={inv.id} invoice={inv} />
+            <div className="flex flex-col gap-2">
+              {invoices.map((invoice) => (
+                <InvoiceCard key={invoice.id} invoice={invoice} />
               ))}
             </div>
           )}
         </TabsContent>
 
-        <TabsContent value="activity" className="mt-0">
-          <Card className="border-dashed border-border/60 bg-muted/20">
-            <CardContent className="flex flex-col items-center justify-center py-12 text-center">
-              <Calendar className="h-8 w-8 text-muted-foreground mb-3" />
-              <h3 className="text-lg font-medium mb-1">
-                Activity feed coming soon
-              </h3>
-              <p className="text-sm text-muted-foreground">
-                A detailed activity timeline for this project will be available.
-              </p>
-            </CardContent>
-          </Card>
+        <TabsContent value="activity">
+          {activity.length === 0 ? (
+            <EmptyState
+              title="Nothing logged yet"
+              description="Every change to this project, its tasks, and its invoices lands here with a timestamp."
+            />
+          ) : (
+            <div className="rounded-lg border border-border bg-card p-1.5">
+              <ActivityFeed items={activity} />
+            </div>
+          )}
         </TabsContent>
 
-        <TabsContent value="ai" className="mt-0">
+        <TabsContent value="ai">
           <AIAssistant projectId={id} />
         </TabsContent>
       </Tabs>
-    </div>
-  );
-}
 
-function StatusBadge({ status }: { status: string }) {
-  const variants: Record<
-    string,
-    "default" | "success" | "warning" | "destructive"
-  > = {
-    active: "default",
-    completed: "success",
-    on_hold: "warning",
-    cancelled: "destructive",
-  };
-  return (
-    <Badge
-      variant={variants[status] ?? "secondary"}
-      className="text-sm capitalize px-3 py-1"
-    >
-      {status.replace("_", " ")}
-    </Badge>
-  );
-}
+      <Separator className="my-8" />
 
-function TabTrigger({
-  value,
-  label,
-}: {
-  value: string;
-  label: string;
-}) {
-  return (
-    <TabsTrigger
-      value={value}
-      className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none px-4 py-3 text-sm font-medium text-muted-foreground data-[state=active]:text-foreground transition-colors"
-    >
-      {label}
-    </TabsTrigger>
+      <div className="flex items-center justify-between gap-3">
+        <Button variant="ghost" size="sm" className="gap-2" asChild>
+          <Link href="/dashboard/projects">
+            <ArrowLeft className="size-3.5" />
+            All projects
+          </Link>
+        </Button>
+        <Num className="text-[11px] text-muted-foreground">
+          Updated {formatDateLong(project.updatedAt)}
+        </Num>
+      </div>
+    </PageShell>
   );
 }

@@ -1,53 +1,73 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { ClerkProvider } from "@clerk/nextjs";
 import { ThemeProvider } from "@/components/theme-provider";
 import { Toaster } from "@/components/ui/sonner";
+import { clerkAppearance } from "@/lib/clerk-appearance";
 import "./globals.css";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
+  display: "swap",
 });
 
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
+  display: "swap",
 });
 
 export const metadata: Metadata = {
-  title: "LumenForge — Run your freelance business in one place",
+  metadataBase: new URL(
+    process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"
+  ),
+  title: {
+    default: "LumenForge — The workspace your clients can see",
+    template: "%s · LumenForge",
+  },
   description:
-    "Client management, project tracking, invoicing, and tasks — beautifully integrated for freelancers.",
-  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000"),
+    "Projects, tasks, and invoices for independent professionals, plus a client portal so you stop sending status updates. AI drafts proposals and summaries from your real project data.",
   keywords: [
-    "freelance",
-    "project management",
-    "invoicing",
+    "freelance business software",
     "client portal",
-    "SaaS",
-    "freelancer tools",
-    "business management",
+    "freelance invoicing",
+    "project management for freelancers",
+    "freelance CRM",
+    "client management software",
   ],
+  applicationName: "LumenForge",
+  authors: [{ name: "LumenForge" }],
   robots: { index: true, follow: true },
   openGraph: {
     type: "website",
     siteName: "LumenForge",
-    title: "LumenForge — Run your freelance business in one place",
+    title: "LumenForge — The workspace your clients can see",
     description:
-      "Project management, client portal, invoicing, and AI assistance — all in a beautiful, secure workspace built for independent professionals.",
+      "Projects, tasks, invoices, and AI drafting for independent professionals. Clients get a portal instead of another status email.",
     url: "/",
   },
   twitter: {
     card: "summary_large_image",
-    title: "LumenForge — Run your freelance business in one place",
+    title: "LumenForge — The workspace your clients can see",
     description:
-      "Project management, client portal, invoicing, and AI assistance — all in a beautiful, secure workspace.",
+      "Projects, tasks, invoices, and AI drafting for independent professionals. Clients get a portal instead of another status email.",
   },
   icons: {
     icon: "/favicon.svg",
     shortcut: "/favicon.svg",
+    apple: "/favicon.svg",
   },
+};
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  viewportFit: "cover",
+  themeColor: [
+    { media: "(prefers-color-scheme: dark)", color: "#181614" },
+    { media: "(prefers-color-scheme: light)", color: "#fbfaf8" },
+  ],
 };
 
 export default function RootLayout({
@@ -62,19 +82,22 @@ export default function RootLayout({
       signUpUrl="/sign-up"
       signInFallbackRedirectUrl="/dashboard"
       signUpFallbackRedirectUrl="/dashboard"
+      appearance={clerkAppearance}
     >
       <html
         lang="en"
         className={`${geistSans.variable} ${geistMono.variable}`}
         suppressHydrationWarning
       >
-        <body className="min-h-screen bg-background text-foreground antialiased" suppressHydrationWarning>
+        <body
+          className="min-h-screen bg-background text-foreground antialiased"
+          suppressHydrationWarning
+        >
           <ThemeProvider
             attribute="class"
             defaultTheme="dark"
             enableSystem
             disableTransitionOnChange
-            enableColorScheme={false}
           >
             {children}
             <Toaster />

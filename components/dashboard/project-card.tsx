@@ -1,9 +1,10 @@
-"use client";
-
 import Link from "next/link";
-import { Calendar, DollarSign, ArrowRight } from "lucide-react";
+import { ArrowRight } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { StatusChip } from "@/components/app/status-chip";
+import { Num } from "@/components/app/num";
+import { formatDeadline, formatMoney, isOverdue } from "@/lib/format";
+import { cn } from "@/lib/utils";
 
 type ProjectRow = {
   id: string;
@@ -15,71 +16,76 @@ type ProjectRow = {
   clientName: string | null;
   clientCompany: string | null;
   updatedAt: string;
+  taskTotal?: number;
+  taskDone?: number;
 };
 
 export function ProjectCard({ project }: { project: ProjectRow }) {
-  const otherParty = project.clientName ?? project.clientCompany ?? "No client";
+  const party = project.clientName ?? project.clientCompany ?? "No client";
+  const overdue =
+    project.status !== "completed" &&
+    project.status !== "cancelled" &&
+    isOverdue(project.dueDate);
+
+  const hasTasks = (project.taskTotal ?? 0) > 0;
+  const percent = hasTasks
+    ? Math.round(((project.taskDone ?? 0) / (project.taskTotal ?? 1)) * 100)
+    : 0;
 
   return (
-    <Link href={`/dashboard/projects/${project.id}`}>
-      <Card className="group border-border/40 bg-card/50 transition-all duration-200 hover:shadow-lg hover:shadow-primary/5 hover:border-primary/20 cursor-pointer">
+    <Link href={`/dashboard/projects/${project.id}`} className="block">
+      <Card className="group transition-colors hover:border-border-strong hover:bg-surface-raised/40">
         <CardContent className="py-4">
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0 flex-1">
-              <h3 className="font-semibold truncate group-hover:text-primary transition-colors">
+              <h3 className="truncate text-[14px] font-semibold tracking-[-0.01em]">
                 {project.title}
               </h3>
-              {project.description && (
-                <p className="text-sm text-muted-foreground truncate mt-1">
-                  {project.description}
-                </p>
-              )}
-              <div className="flex flex-wrap items-center gap-3 mt-3">
-                <StatusBadge status={project.status} />
-                <span className="text-xs text-muted-foreground">
-                  {otherParty}
+              <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-2">
+                <StatusChip status={project.status} />
+                <span className="truncate text-[12px] text-muted-foreground">
+                  {party}
                 </span>
-                {project.budget != null && project.budget > 0 && (
-                  <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                    <DollarSign className="h-3 w-3" />
-                    {(project.budget / 100).toLocaleString()}
-                  </span>
-                )}
-                {project.dueDate && (
-                  <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                    <Calendar className="h-3 w-3" />
-                    {new Date(project.dueDate).toLocaleDateString("en-US", {
-                      month: "short",
-                      day: "numeric",
-                    })}
-                  </span>
-                )}
+                {project.budget != null && project.budget > 0 ? (
+                  <Num className="text-[12px] text-muted-foreground">
+                    {formatMoney(project.budget)}
+                  </Num>
+                ) : null}
+                <span
+                  className={cn(
+                    "text-[12px]",
+                    overdue
+                      ? "font-medium text-negative"
+                      : "text-muted-foreground"
+                  )}
+                >
+                  {formatDeadline(project.dueDate)}
+                </span>
               </div>
             </div>
-            <ArrowRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity shrink-0 mt-1" />
+
+            <ArrowRight className="mt-0.5 size-4 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
           </div>
+
+          {hasTasks ? (
+            <div className="mt-3.5 flex items-center gap-3">
+              <div
+                className="h-1 flex-1 overflow-hidden rounded-full bg-surface-raised"
+                role="img"
+                aria-label={`${project.taskDone} of ${project.taskTotal} tasks done`}
+              >
+                <div
+                  className="h-full rounded-full bg-signal transition-[width] duration-[var(--dur-slow)] ease-out-expo"
+                  style={{ width: `${percent}%` }}
+                />
+              </div>
+              <Num className="shrink-0 text-[11px] text-muted-foreground">
+                {project.taskDone}/{project.taskTotal}
+              </Num>
+            </div>
+          ) : null}
         </CardContent>
       </Card>
     </Link>
-  );
-}
-
-function StatusBadge({ status }: { status: string }) {
-  const variants: Record<
-    string,
-    "default" | "success" | "warning" | "destructive"
-  > = {
-    active: "default",
-    completed: "success",
-    on_hold: "warning",
-    cancelled: "destructive",
-  };
-  return (
-    <Badge
-      variant={variants[status] ?? "secondary"}
-      className="text-xs capitalize"
-    >
-      {status.replace("_", " ")}
-    </Badge>
   );
 }

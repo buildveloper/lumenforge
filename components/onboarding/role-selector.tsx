@@ -2,111 +2,137 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Briefcase, Users, ArrowRight } from "lucide-react";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from "@/components/ui/dialog";
-import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { updateUserRole } from "@/server/actions/user";
+import { Briefcase, Users } from "lucide-react";
 import { toast } from "sonner";
 
-export function RoleSelector() {
-  const router = useRouter();
-  const [selecting, setSelecting] = useState(false);
+import { Logo } from "@/components/brand/logo";
+import { updateUserRole } from "@/server/actions/user";
+import { cn } from "@/lib/utils";
 
-  async function handleSelect(role: "freelancer" | "client") {
-    setSelecting(true);
+type Option = {
+  role: "freelancer" | "client";
+  icon: React.ComponentType<{ className?: string }>;
+  title: string;
+  body: string;
+  gains: string[];
+};
+
+const OPTIONS: Option[] = [
+  {
+    role: "freelancer",
+    icon: Briefcase,
+    title: "I sell the work",
+    body: "You run the engagements and get paid for them.",
+    gains: [
+      "Clients, projects, and a Kanban board",
+      "Invoices with your own numbering",
+      "AI drafts proposals and updates from real project data",
+    ],
+  },
+  {
+    role: "client",
+    icon: Users,
+    title: "I'm the client",
+    body: "You're here to see progress and invoices for work you commissioned.",
+    gains: [
+      "Progress on every project shared with your email",
+      "Invoices addressed to you",
+      "Approve deliverables or ask for changes",
+    ],
+  },
+];
+
+/**
+ * Shown once, when the account has no role yet. These are real buttons rather
+ * than clickable divs, so it is reachable by keyboard, and Escape is allowed to
+ * dismiss the dialog chrome without blocking the choice.
+ */
+export function RoleSelector() {
+  const [pending, setPending] = useState<Option["role"] | null>(null);
+  const router = useRouter();
+
+  async function choose(role: Option["role"]) {
+    setPending(role);
     try {
-      await updateUserRole({ role });
-      toast.success(
-        role === "freelancer"
-          ? "Welcome, freelancer!"
-          : "Welcome! Let's get started."
-      );
+      const result = await updateUserRole({ role });
+      if (role === "client" && result.claimed > 0) {
+        toast.success(
+          `Found ${result.claimed} ${result.claimed === 1 ? "record" : "records"} linked to your email`
+        );
+      } else if (role === "client") {
+        toast.success("You're set up as a client");
+      } else {
+        toast.success("You're set up as a freelancer");
+      }
       router.refresh();
-    } catch (error) {
-      console.error("[LumenForge] RoleSelector updateUserRole failed:", error);
-      toast.error(
-        error instanceof Error ? error.message : "Failed to set role"
-      );
-    } finally {
-      setSelecting(false);
+    } catch {
+      setPending(null);
+      toast.error("Couldn't save that. Try again.");
     }
   }
 
   return (
-    <Dialog open modal>
-      <DialogContent
-        className="sm:max-w-lg"
-        onPointerDownOutside={(e) => e.preventDefault()}
-        onEscapeKeyDown={(e) => e.preventDefault()}
-      >
-        <DialogHeader className="text-center">
-          <DialogTitle className="text-2xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-background p-4 scroll-thin">
+      <div className="w-full max-w-2xl">
+        <div className="mb-8 flex flex-col items-center text-center">
+          <Logo />
+          <h1 className="mt-6 text-xl font-semibold tracking-[-0.02em] sm:text-2xl">
             How will you use LumenForge?
-          </DialogTitle>
-          <DialogDescription className="text-base">
-            Choose your role to personalize your experience. You can change this
-            later in settings.
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="grid gap-4 pt-4 sm:grid-cols-2">
-          <Card
-            className="cursor-pointer border-border/40 bg-card/50 transition-all duration-200 hover:border-primary/40 hover:shadow-lg hover:shadow-primary/5 hover:scale-[1.02]"
-            onClick={() => !selecting && handleSelect("freelancer")}
-          >
-            <CardHeader className="text-center py-8">
-              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 mx-auto mb-4">
-                <Briefcase className="h-7 w-7 text-primary" />
-              </div>
-              <CardTitle className="text-lg">I am a Freelancer</CardTitle>
-              <CardDescription className="text-sm leading-relaxed">
-                Manage projects, track invoices, and collaborate with clients
-                from one place.
-              </CardDescription>
-              {selecting ? (
-                <div className="mt-4 h-9 flex items-center justify-center">
-                  <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-                </div>
-              ) : (
-                <div className="mt-4 flex items-center justify-center gap-1 text-sm font-medium text-primary opacity-0 group-hover:opacity-100 transition-opacity">
-                  Get Started <ArrowRight className="h-4 w-4" />
-                </div>
-              )}
-            </CardHeader>
-          </Card>
-
-          <Card
-            className="cursor-pointer border-border/40 bg-card/50 transition-all duration-200 hover:border-primary/40 hover:shadow-lg hover:shadow-primary/5 hover:scale-[1.02]"
-            onClick={() => !selecting && handleSelect("client")}
-          >
-            <CardHeader className="text-center py-8">
-              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10 mx-auto mb-4">
-                <Users className="h-7 w-7 text-primary" />
-              </div>
-              <CardTitle className="text-lg">I am a Client</CardTitle>
-              <CardDescription className="text-sm leading-relaxed">
-                View project progress, approve deliverables, and manage invoices
-                from your freelancer.
-              </CardDescription>
-              {selecting ? (
-                <div className="mt-4 h-9 flex items-center justify-center">
-                  <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-                </div>
-              ) : (
-                <div className="mt-4 flex items-center justify-center gap-1 text-sm font-medium text-primary opacity-0 group-hover:opacity-100 transition-opacity">
-                  Get Started <ArrowRight className="h-4 w-4" />
-                </div>
-              )}
-            </CardHeader>
-          </Card>
+          </h1>
+          <p className="mt-2 max-w-md text-[13px] leading-5 text-muted-foreground">
+            This decides what you see first. You can switch it later in settings,
+            and nothing is deleted if you do.
+          </p>
         </div>
-      </DialogContent>
-    </Dialog>
+
+        <div className="grid gap-3 sm:grid-cols-2">
+          {OPTIONS.map((option) => {
+            const busy = pending === option.role;
+            return (
+              <button
+                key={option.role}
+                type="button"
+                onClick={() => choose(option.role)}
+                disabled={pending !== null}
+                aria-busy={busy}
+                className={cn(
+                  "group flex flex-col rounded-xl border border-border bg-card p-5 text-left transition-colors",
+                  "hover:border-signal/40 hover:bg-surface-raised/40",
+                  "disabled:cursor-not-allowed disabled:opacity-60",
+                  busy && "border-signal/40"
+                )}
+              >
+                <span className="mb-4 grid size-9 place-items-center rounded-md border border-border bg-surface-sunken text-signal">
+                  <option.icon className="size-4" />
+                </span>
+
+                <span className="text-[15px] font-semibold tracking-[-0.01em]">
+                  {option.title}
+                </span>
+                <span className="mt-1 text-[13px] leading-5 text-muted-foreground">
+                  {option.body}
+                </span>
+
+                <ul className="mt-4 flex flex-col gap-1.5">
+                  {option.gains.map((gain) => (
+                    <li
+                      key={gain}
+                      className="flex items-start gap-2 text-[12px] leading-5 text-muted-foreground"
+                    >
+                      <span className="mt-2 size-1 shrink-0 rounded-full bg-border-strong" />
+                      {gain}
+                    </li>
+                  ))}
+                </ul>
+
+                <span className="mt-5 text-[12px] font-medium text-signal">
+                  {busy ? "Setting up…" : "Choose this"}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    </div>
   );
 }

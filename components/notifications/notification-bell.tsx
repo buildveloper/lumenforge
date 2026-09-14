@@ -1,136 +1,179 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Bell } from "lucide-react";
+
 import { Button } from "@/components/ui/button";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { Separator } from "@/components/ui/separator";
-import { getNotifications, markAsRead, markAllAsRead, getUnreadCount } from "@/server/actions/notification";
-import { useRouter } from "next/navigation";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { formatRelative } from "@/lib/format";
+import { cn } from "@/lib/utils";
+import {
+  getNotifications,
+  getUnreadCount,
+  markAllAsRead,
+  markAsRead,
+} from "@/server/actions/notification";
 
-export function NotificationBell() {
-  const router = useRouter();
+type NotificationRow = Awaited<ReturnType<typeof getNotifications>>[number];
+
+/**
+ * Notifications arrive with the server render, so the bell is correct on first
+ * paint rather than empty-then-populated. The effect only polls, which keeps it
+ * a genuine subscription to an external system.
+ */
+export function NotificationBell({
+  initialItems,
+  initialUnread,
+}: {
+  initialItems: NotificationRow[];
+  initialUnread: number;
+}) {
   const [open, setOpen] = useState(false);
-  const [notifications, setNotifications] = useState<any[]>([]);
-  const [unread, setUnread] = useState(0);
+  const [items, setItems] = useState(initialItems);
+  const [unread, setUnread] = useState(initialUnread);
+  const router = useRouter();
 
-  async function load() {
-    const [data, count] = await Promise.all([
-      getNotifications(10),
+  const refresh = useCallback(async () => {
+    const [list, count] = await Promise.all([
+      getNotifications(12),
       getUnreadCount(),
     ]);
-    setNotifications(data);
+    setItems(list);
     setUnread(count);
-  }
-
-  useEffect(() => {
-    load();
-    const interval = setInterval(load, 30000);
-    return () => clearInterval(interval);
   }, []);
 
-  async function handleClick(notification: any) {
-    if (!notification.isRead) {
-      await markAsRead(notification.id);
-      load();
-    }
-    if (notification.entityId && notification.entityType === "project") {
-      router.push(`/dashboard/projects/${notification.entityId}`);
-    }
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      if (document.visibilityState !== "visible") return;
+      void refresh().catch(() => {
+        // A dropped poll is not worth interrupting anyone over.
+      });
+    }, 60_000);
+
+    return () => window.clearInterval(timer);
+  }, [refresh]);
+
+  async function handleOpen(
+    id: string,
+    entityType: string | null,
+    entityId: string | null
+  ) {
     setOpen(false);
+    await markAsRead(id);
+    await refresh().catch(() => {});
+    if (entityType === "project" && entityId) {
+      router.push(`/dashboard/projects/${entityId}`);
+    } else {
+      router.push("/dashboard/activity");
+    }
   }
 
   async function handleMarkAll() {
     await markAllAsRead();
-    load();
+    await refresh().catch(() => {});
+    router.refresh();
   }
-
-  const timeAgo = (date: string) => {
-    const diff = Date.now() - new Date(date).getTime();
-    const mins = Math.floor(diff / 60000);
-    if (mins < 1) return "just now";
-    if (mins < 60) return `${mins}m ago`;
-    const hours = Math.floor(mins / 60);
-    if (hours < 24) return `${hours}h ago`;
-    return `${Math.floor(hours / 24)}d ago`;
-  };
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
-      <PopoverTrigger asChild>
-        <Button variant="ghost" size="icon" className="relative">
-          <Bell className="h-5 w-5" />
-          {unread > 0 && (
-            <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground">
-              {unread > 9 ? "9+" : unread}
-            </span>
-          )}
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent align="end" className="w-80 p-0">
-        <div className="flex items-center justify-between px-4 py-3 border-b border-border/40">
-          <h4 className="text-sm font-semibold">Notifications</h4>
-          {unread > 0 && (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <PopoverTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              aria-label={
+                unread > 0 ? `Notifications, ${unread} unread` : "Notifications"
+              }
+              className="relative"
+            >
+              <Bell className="size-4" />
+              {unread > 0 ? (
+                <span className="absolute right-1.5 top-1.5 size-2 rounded-full bg-signal ring-2 ring-background" />
+              ) : null}
+            </Button>
+          </PopoverTrigger>
+        </TooltipTrigger>
+        <TooltipContent>Activity</TooltipContent>
+      </Tooltip>
+
+      <PopoverContent align="end" className="w-[340px] p-0">
+        <div className="flex items-center justify-between border-b border-border px-3.5 py-2.5">
+          <span className="text-[13px] font-medium">Activity</span>
+          {unread > 0 ? (
             <button
+              type="button"
               onClick={handleMarkAll}
-              className="text-xs text-primary hover:underline"
+              className="text-[12px] text-muted-foreground transition-colors hover:text-foreground"
             >
               Mark all read
             </button>
-          )}
+          ) : null}
         </div>
-        <div className="max-h-[360px] overflow-y-auto">
-          {notifications.length === 0 ? (
-            <div className="py-12 text-center">
-              <Bell className="h-8 w-8 text-muted-foreground mx-auto mb-3" />
-              <p className="text-sm text-muted-foreground">
-                No notifications yet
-              </p>
-            </div>
+
+        <div className="max-h-[360px] overflow-y-auto scroll-thin">
+          {items.length === 0 ? (
+            <p className="px-3.5 py-10 text-center text-[13px] text-muted-foreground">
+              Nothing has happened yet. Creating a project, task, or invoice
+              will show up here.
+            </p>
           ) : (
-            notifications.map((n) => (
-              <button
-                key={n.id}
-                onClick={() => handleClick(n)}
-                className={`w-full text-left px-4 py-3 hover:bg-muted/50 transition-colors border-b border-border/20 last:border-b-0 ${
-                  !n.isRead ? "bg-primary/5" : ""
-                }`}
-              >
-                <div className="flex items-start gap-3">
-                  {!n.isRead && (
-                    <div className="mt-1.5 h-2 w-2 rounded-full bg-primary shrink-0" />
-                  )}
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium truncate">{n.title}</p>
-                    {n.message && (
-                      <p className="text-xs text-muted-foreground truncate mt-0.5">
-                        {n.message}
-                      </p>
+            <ul>
+              {items.map((item) => (
+                <li key={item.id}>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      handleOpen(item.id, item.entityType, item.entityId)
+                    }
+                    className={cn(
+                      "flex w-full gap-2.5 border-b border-border/60 px-3.5 py-3 text-left transition-colors last:border-b-0 hover:bg-surface-raised/50",
+                      !item.isRead && "bg-signal-subtle/40"
                     )}
-                    <p className="text-[10px] text-muted-foreground mt-1">
-                      {timeAgo(n.createdAt)}
-                    </p>
-                  </div>
-                </div>
-              </button>
-            ))
+                  >
+                    <span
+                      className={cn(
+                        "mt-1.5 size-1.5 shrink-0 rounded-full",
+                        item.isRead ? "bg-transparent" : "bg-signal"
+                      )}
+                    />
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-[13px] font-medium">
+                        {item.title}
+                      </span>
+                      {item.message ? (
+                        <span className="mt-0.5 block truncate text-[12px] text-muted-foreground">
+                          {item.message}
+                        </span>
+                      ) : null}
+                      <span className="mt-1 block text-[11px] text-muted-foreground">
+                        {formatRelative(item.createdAt)}
+                      </span>
+                    </span>
+                  </button>
+                </li>
+              ))}
+            </ul>
           )}
         </div>
-        <Separator />
-        <div className="p-2">
-          <button
-            onClick={() => {
-              setOpen(false);
-              router.push("/dashboard/activity");
-            }}
-            className="w-full py-2 text-sm text-muted-foreground hover:text-foreground transition-colors text-center"
+
+        <div className="border-t border-border p-1.5">
+          <Button
+            variant="ghost"
+            size="sm"
+            className="w-full justify-center text-[12px]"
+            asChild
           >
-            View all activity
-          </button>
+            <a href="/dashboard/activity" onClick={() => setOpen(false)}>
+              View all activity
+            </a>
+          </Button>
         </div>
       </PopoverContent>
     </Popover>

@@ -12,7 +12,9 @@ export const email = z.string().trim().email().max(255);
 
 export const requiredString = z.string().trim().min(1);
 
-export const url = z.string().trim().url();
+// How much detail each field can carry. A client name is not a project brief.
+const SHORT = 200;
+const LONG = 2000;
 
 // -- Pagination ---------------------------------------------------------------
 
@@ -27,26 +29,40 @@ export const updateRoleSchema = z.object({
   role: z.enum(["freelancer", "client"]),
 });
 
+export const notificationPreferencesSchema = z.object({
+  notifyProjectUpdates: z.boolean(),
+  notifyTaskAssignments: z.boolean(),
+  notifyInvoiceStatus: z.boolean(),
+  notifyAiCompletion: z.boolean(),
+});
+
 // -- Client schemas -----------------------------------------------------------
 
 export const createClientSchema = z.object({
-  name: requiredString.min(1).max(200),
+  name: requiredString.max(SHORT),
   email: email.optional(),
-  company: z.string().max(200).optional(),
-  phone: z.string().max(50).optional(),
-  notes: z.string().max(2000).optional(),
+  company: z.string().trim().max(SHORT).optional(),
+  phone: z.string().trim().max(50).optional(),
+  notes: z.string().max(LONG).optional(),
 });
 
-export const deleteClientSchema = z.object({
-  clientId: requiredString,
+/** Nullable throughout so an edit can clear a field, not only set one. */
+export const updateClientSchema = z.object({
+  name: requiredString.max(SHORT).optional(),
+  email: email.nullable().optional(),
+  company: z.string().trim().max(SHORT).nullable().optional(),
+  phone: z.string().trim().max(50).nullable().optional(),
+  notes: z.string().max(LONG).nullable().optional(),
 });
+
+export const clientIdSchema = z.object({ clientId: requiredString });
 
 // -- Project schemas ----------------------------------------------------------
 
 export const createProjectSchema = z.object({
   clientId: z.string().optional(),
-  title: requiredString.min(1).max(300),
-  description: z.string().max(2000).optional(),
+  title: requiredString.max(300),
+  description: z.string().max(LONG).optional(),
   status: z
     .enum(["active", "completed", "on_hold", "cancelled"])
     .default("active"),
@@ -54,18 +70,22 @@ export const createProjectSchema = z.object({
   dueDate: z.string().optional(),
 });
 
-export const deleteProjectSchema = z.object({
-  projectId: requiredString,
-});
-
 export const updateProjectSchema = z.object({
-  title: requiredString.min(1).max(300).optional(),
-  description: z.string().max(2000).nullable().optional(),
-  status: z
-    .enum(["active", "completed", "on_hold", "cancelled"])
-    .optional(),
+  clientId: z.string().nullable().optional(),
+  title: requiredString.max(300).optional(),
+  description: z.string().max(LONG).nullable().optional(),
+  status: z.enum(["active", "completed", "on_hold", "cancelled"]).optional(),
   budget: z.coerce.number().int().min(0).optional(),
   dueDate: z.string().nullable().optional(),
+});
+
+export const projectIdSchema = z.object({ projectId: requiredString });
+
+/** A client's verdict on a deliverable. Recorded, never silently applied. */
+export const projectApprovalSchema = z.object({
+  projectId: requiredString,
+  decision: z.enum(["approve", "request_changes"]),
+  note: z.string().max(LONG).optional(),
 });
 
 // -- Invoice schemas ----------------------------------------------------------
@@ -73,12 +93,11 @@ export const updateProjectSchema = z.object({
 export const createInvoiceSchema = z.object({
   clientId: z.string().optional(),
   projectId: z.string().optional(),
-  invoiceNumber: requiredString.min(1).max(50),
   status: z
     .enum(["draft", "sent", "paid", "overdue", "cancelled"])
     .default("draft"),
   amount: z.coerce.number().int().min(0).default(0),
-  notes: z.string().max(2000).optional(),
+  notes: z.string().max(LONG).optional(),
   dueDate: z.string().optional(),
 });
 
@@ -88,33 +107,34 @@ export const updateInvoiceStatusSchema = z.object({
 
 export const updateInvoiceSchema = z.object({
   amount: z.coerce.number().int().min(0).optional(),
-  notes: z.string().max(2000).nullable().optional(),
+  notes: z.string().max(LONG).nullable().optional(),
   dueDate: z.string().nullable().optional(),
   status: z.enum(["draft", "sent", "paid", "overdue", "cancelled"]).optional(),
 });
 
-export const deleteInvoiceSchema = z.object({
-  invoiceId: requiredString,
-});
+export const invoiceIdSchema = z.object({ invoiceId: requiredString });
 
 // -- Task schemas -------------------------------------------------------------
 
 export const createTaskSchema = z.object({
   projectId: z.string().optional(),
-  title: requiredString.min(1).max(300),
-  description: z.string().max(2000).optional(),
-  status: z.enum(["todo", "in_progress", "review", "done"]).optional().default("todo"),
+  title: requiredString.max(300),
+  description: z.string().max(LONG).optional(),
+  status: z
+    .enum(["todo", "in_progress", "review", "done"])
+    .optional()
+    .default("todo"),
   priority: z.enum(["low", "medium", "high"]).default("medium"),
-  assignee: z.string().max(100).optional(),
+  assignee: z.string().trim().max(100).optional(),
   dueDate: z.string().optional(),
 });
 
 export const updateTaskSchema = z.object({
-  title: requiredString.min(1).max(300).optional(),
-  description: z.string().max(2000).nullable().optional(),
+  title: requiredString.max(300).optional(),
+  description: z.string().max(LONG).nullable().optional(),
   status: z.enum(["todo", "in_progress", "review", "done"]).optional(),
   priority: z.enum(["low", "medium", "high"]).optional(),
-  assignee: z.string().max(100).nullable().optional(),
+  assignee: z.string().trim().max(100).nullable().optional(),
   dueDate: z.string().nullable().optional(),
 });
 
@@ -122,19 +142,18 @@ export const updateTaskStatusSchema = z.object({
   status: z.enum(["todo", "in_progress", "review", "done"]),
 });
 
-// -- API key ------------------------------------------------------------------
-
-export const apiKeyCreateSchema = z.object({
-  name: requiredString.max(100),
-  expiresInDays: z.number().int().min(1).max(365).optional(),
-});
+export const taskIdSchema = z.object({ taskId: requiredString });
 
 // -- Inferred types -----------------------------------------------------------
 
 export type UpdateRoleInput = z.infer<typeof updateRoleSchema>;
-export type UpdateProjectInput = z.infer<typeof updateProjectSchema>;
+export type NotificationPreferencesInput = z.infer<
+  typeof notificationPreferencesSchema
+>;
 export type CreateClientInput = z.infer<typeof createClientSchema>;
+export type UpdateClientInput = z.infer<typeof updateClientSchema>;
 export type CreateProjectInput = z.infer<typeof createProjectSchema>;
+export type UpdateProjectInput = z.infer<typeof updateProjectSchema>;
 export type CreateInvoiceInput = z.infer<typeof createInvoiceSchema>;
 export type UpdateInvoiceInput = z.infer<typeof updateInvoiceSchema>;
 export type UpdateInvoiceStatusInput = z.infer<typeof updateInvoiceStatusSchema>;
@@ -142,3 +161,4 @@ export type CreateTaskInput = z.infer<typeof createTaskSchema>;
 export type UpdateTaskInput = z.infer<typeof updateTaskSchema>;
 export type UpdateTaskStatusInput = z.infer<typeof updateTaskStatusSchema>;
 export type PaginationInput = z.infer<typeof paginationSchema>;
+export type ProjectApprovalInput = z.infer<typeof projectApprovalSchema>;

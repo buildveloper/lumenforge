@@ -5,45 +5,60 @@ import {
   SortableContext,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
+import { Plus } from "lucide-react";
+
+import { Num } from "@/components/app/num";
+import { cn } from "@/lib/utils";
 import type { KanbanTask } from "./types";
 import { TaskCard } from "./task-card";
-
-type KanbanColumnProps = {
-  columnId: string;
-  label: string;
-  tasks: KanbanTask[];
-  onTaskClick: (task: KanbanTask) => void;
-};
 
 export function KanbanColumn({
   columnId,
   label,
   tasks,
   onTaskClick,
-}: KanbanColumnProps) {
+  onAddTask,
+  canCreate,
+}: {
+  columnId: string;
+  label: string;
+  tasks: KanbanTask[];
+  onTaskClick: (task: KanbanTask) => void;
+  onAddTask?: (columnId: string) => void;
+  canCreate?: boolean;
+}) {
   const { setNodeRef, isOver } = useDroppable({ id: columnId });
 
   return (
-    <div className="flex flex-col min-w-[280px] max-w-[320px] flex-1">
-      {/* Column header */}
-      <div className="flex items-center justify-between mb-3 px-1">
-        <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">
+    <div className="flex min-w-[264px] max-w-[300px] flex-1 flex-col">
+      <div className="mb-2.5 flex items-center justify-between gap-2 px-1">
+        <h3 className="flex items-center gap-2 text-[12px] font-medium text-muted-foreground">
           {label}
+          <Num className="text-[11px] text-muted-foreground/70">{tasks.length}</Num>
         </h3>
-        <span className="text-xs text-muted-foreground bg-muted/50 rounded-full px-2 py-0.5">
-          {tasks.length}
-        </span>
+        {canCreate && onAddTask ? (
+          <button
+            type="button"
+            onClick={() => onAddTask(columnId)}
+            aria-label={`Add a task to ${label}`}
+            className="grid size-7 place-items-center rounded-sm text-muted-foreground transition-colors hover:bg-surface-raised hover:text-foreground [@media(pointer:coarse)]:size-9"
+          >
+            <Plus className="size-3.5" />
+          </button>
+        ) : null}
       </div>
 
-      {/* Droppable area */}
       <div
         ref={setNodeRef}
-        className={`flex flex-col gap-2 p-2 rounded-xl min-h-[200px] transition-colors ${
-          isOver ? "bg-primary/5 ring-1 ring-primary/20" : "bg-muted/20"
-        }`}
+        className={cn(
+          "flex min-h-32 flex-1 flex-col gap-2 rounded-lg border border-transparent p-2 transition-colors",
+          isOver
+            ? "border-signal/30 bg-signal-subtle/50"
+            : "bg-surface-sunken/50"
+        )}
       >
         <SortableContext
-          items={tasks.map((t) => t.id)}
+          items={tasks.map((task) => task.id)}
           strategy={verticalListSortingStrategy}
         >
           {tasks.map((task) => (
@@ -51,11 +66,11 @@ export function KanbanColumn({
           ))}
         </SortableContext>
 
-        {tasks.length === 0 && !isOver && (
-          <div className="flex items-center justify-center h-24 text-xs text-muted-foreground border border-dashed border-border/60 rounded-lg">
-            Drop tasks here
-          </div>
-        )}
+        {tasks.length === 0 ? (
+          <p className="grid flex-1 place-items-center rounded-md border border-dashed border-border px-3 py-6 text-center text-[11px] text-muted-foreground">
+            {isOver ? "Drop here" : "Nothing in this column"}
+          </p>
+        ) : null}
       </div>
     </div>
   );

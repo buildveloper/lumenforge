@@ -1,8 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
-import { Button } from "@/components/ui/button";
-import { AlertTriangle } from "lucide-react";
+import { ErrorState } from "@/components/app/error-state";
 
 export default function InvoicesError({
   error,
@@ -11,26 +9,12 @@ export default function InvoicesError({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
-  useEffect(() => {
-    console.error(error);
-  }, [error]);
-
   return (
-    <div className="flex items-center justify-center py-20">
-      <div className="text-center space-y-5 max-w-md">
-        <div className="mx-auto w-12 h-12 rounded-full bg-destructive/10 flex items-center justify-center">
-          <AlertTriangle className="h-6 w-6 text-destructive" />
-        </div>
-        <div className="space-y-2">
-          <h2 className="text-lg font-semibold">Failed to load invoices</h2>
-          <p className="text-sm text-muted-foreground">
-            We couldn&apos;t load your invoices. Please try again.
-          </p>
-        </div>
-        <Button onClick={reset} variant="outline">
-          Try again
-        </Button>
-      </div>
-    </div>
+    <ErrorState
+      title="Couldn't load invoices"
+      description="No invoice data was changed. Something failed while reading the list."
+      digest={error.digest}
+      reset={reset}
+    />
   );
 }

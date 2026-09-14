@@ -1,56 +1,68 @@
 import { auth } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
-import { Briefcase, Plus } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
+import Link from "next/link";
+import { X } from "lucide-react";
+
+import { PageHeader, PageShell } from "@/components/app/page-shell";
 import { Button } from "@/components/ui/button";
-import { ProjectCard } from "@/components/dashboard/project-card";
-import { ProjectsClient } from "./projects-client";
-
+import { ProjectsView } from "@/components/dashboard/projects-view";
+import { getClientOptions } from "@/server/actions/client";
 import { getUserProjects } from "@/server/actions/project";
+import { getProfile } from "@/server/actions/user";
 
-export default async function ProjectsPage() {
+export default async function ProjectsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ new?: string; client?: string }>;
+}) {
   const { userId } = await auth();
   if (!userId) redirect("/sign-in");
 
-  const { projects, total } = await getUserProjects({ page: 1, limit: 20 });
+  const profile = await getProfile();
+  if (profile.role === "user") return null;
+
+  const isClient = profile.role === "client";
+  const params = await searchParams;
+
+  const [projectData, clients] = await Promise.all([
+    getUserProjects({ page: 1, limit: 60, clientId: params.client }),
+    isClient ? Promise.resolve([]) : getClientOptions(),
+  ]);
+
+  const clientFilterName = params.client
+    ? (projectData.projects[0]?.clientName ?? "this client")
+    : undefined;
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
-      {/* -- Header ------------------------------------------------ */}
-      <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
-            Projects
-          </h1>
-          <p className="mt-1 text-muted-foreground">
-            {total} project{total !== 1 ? "s" : ""} total
-          </p>
-        </div>
-        <ProjectsClient />
-      </div>
+    <PageShell>
+      <PageHeader
+        title="Projects"
+        description={
+          clientFilterName
+            ? `Filtered to ${clientFilterName}`
+            : projectData.total === 0
+              ? "One project per engagement, with its tasks and invoices attached."
+              : `${projectData.total} project${projectData.total === 1 ? "" : "s"}`
+        }
+        actions={
+          params.client ? (
+            <Button variant="outline" size="sm" className="gap-2" asChild>
+              <Link href="/dashboard/projects">
+                <X className="size-3.5" />
+                Clear filter
+              </Link>
+            </Button>
+          ) : null
+        }
+      />
 
-      {/* -- Projects List ---------------------------------------- */}
-      {projects.length === 0 ? (
-        <Card className="border-dashed border-border/60 bg-muted/20">
-          <CardContent className="flex flex-col items-center justify-center py-16 text-center">
-            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10 mb-6">
-              <Briefcase className="h-8 w-8 text-primary" />
-            </div>
-            <h2 className="text-xl font-semibold mb-2">No projects yet</h2>
-            <p className="text-muted-foreground mb-8 max-w-sm">
-              Create your first project to start tracking work and
-              collaborating.
-            </p>
-            <ProjectsClient />
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="space-y-3">
-          {projects.map((project) => (
-            <ProjectCard key={project.id} project={project} />
-          ))}
-        </div>
-      )}
-    </div>
+      <ProjectsView
+        projects={projectData.projects}
+        clients={clients}
+        isClient={isClient}
+        initialOpen={params.new === "1"}
+        clientFilterName={clientFilterName}
+      />
+    </PageShell>
   );
 }

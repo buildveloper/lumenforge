@@ -1,98 +1,455 @@
 @import "tailwindcss";
+@plugin "@tailwindcss/typography";
+
+/* LumenForge design tokens — dark-first. Source of truth: DESIGN.md */
+
+@custom-variant dark (&:where(.dark, .dark *));
 
 @theme inline {
+  /* ── Color roles ───────────────────────────────────────────── */
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
   --color-card-foreground: var(--card-foreground);
   --color-popover: var(--popover);
   --color-popover-foreground: var(--popover-foreground);
+  --color-surface-raised: var(--surface-raised);
+  --color-surface-sunken: var(--surface-sunken);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
   --color-primary: var(--primary);
   --color-primary-foreground: var(--primary-foreground);
   --color-secondary: var(--secondary);
   --color-secondary-foreground: var(--secondary-foreground);
-  --color-muted: var(--muted);
-  --color-muted-foreground: var(--muted-foreground);
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
-  --color-destructive: var(--destructive);
-  --color-destructive-foreground: var(--destructive-foreground);
   --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
   --color-input: var(--input);
   --color-ring: var(--ring);
-  --color-success: var(--success);
-  --color-success-foreground: var(--success-foreground);
-  --color-warning: var(--warning);
-  --color-warning-foreground: var(--warning-foreground);
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+
+  /* brass — signal only, never a button fill */
+  --color-signal: var(--signal);
+  --color-signal-subtle: var(--signal-subtle);
+  --color-signal-deep: var(--signal-deep);
+  --color-positive: var(--positive);
+  --color-negative: var(--negative);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+
+  /* ── Geometry: 3 / 5 / 7 / 10 ──────────────────────────────── */
+  --radius-xs: 2px;
+  --radius-sm: 3px;
+  --radius-md: 5px;
+  --radius-lg: 7px;
+  --radius-xl: 10px;
+  --radius-2xl: 12px;
+  --radius-3xl: 14px;
+
+  /* ── Type ──────────────────────────────────────────────────── */
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, monospace;
+  --font-display: var(--font-instrument, var(--font-geist-sans)), ui-serif, Georgia, serif;
+
+  /* ── Easing ────────────────────────────────────────────────── */
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in-out-quart: cubic-bezier(0.65, 0, 0.35, 1);
+
+  /* ── Elevation: overlays only ──────────────────────────────── */
+  --shadow-overlay: var(--elevation-overlay);
+  --shadow-popover: var(--elevation-popover);
 }
 
-/* ── Dark mode (default) ──────────────────────────────────────── */
+/* ── Light ─────────────────────────────────────────────────────── */
 :root {
-  --background: #0a0a10;
-  --foreground: #e4e4ec;
-  --card: #111118;
-  --card-foreground: #e4e4ec;
-  --popover: #111118;
-  --popover-foreground: #e4e4ec;
-  --primary: #6366f1;
-  --primary-foreground: #ffffff;
-  --secondary: #1e1e2e;
-  --secondary-foreground: #e4e4ec;
-  --muted: #1a1a2e;
-  --muted-foreground: #8b8ba7;
-  --accent: #312e81;
-  --accent-foreground: #e0e7ff;
-  --destructive: #dc2626;
-  --destructive-foreground: #ffffff;
-  --success: #16a34a;
-  --success-foreground: #ffffff;
-  --warning: #ca8a04;
-  --warning-foreground: #0a0a10;
-  --border: #272740;
-  --input: #272740;
-  --ring: #818cf8;
-  --radius: 0.75rem;
+  --background: oklch(0.985 0.004 85);
+  --foreground: oklch(0.205 0.008 75);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.205 0.008 75);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.205 0.008 75);
+  --surface-raised: oklch(0.972 0.005 85);
+  --surface-sunken: oklch(0.962 0.006 85);
+  --muted: oklch(0.958 0.005 85);
+  --muted-foreground: oklch(0.470 0.010 78);
+  --primary: oklch(0.205 0.008 75);
+  --primary-foreground: oklch(0.985 0.004 85);
+  --secondary: oklch(0.958 0.005 85);
+  --secondary-foreground: oklch(0.205 0.008 75);
+  --accent: oklch(0.952 0.007 82);
+  --accent-foreground: oklch(0.205 0.008 75);
+  --border: oklch(0.905 0.006 80);
+  --border-strong: oklch(0.845 0.008 78);
+  --input: oklch(0.882 0.007 80);
+
+  /* Light-mode accents are deliberately deeper than the dark-mode ones.
+     Against a near-white surface a mid-tone gold only reaches ~4.2:1 on the
+     tinted chip background, so these are the values that actually clear 4.5:1
+     text contrast. They read as bronze on paper and as brass on charcoal. */
+  --signal: oklch(0.430 0.110 70);
+  --signal-subtle: oklch(0.965 0.028 80);
+  --signal-deep: oklch(0.370 0.100 68);
+  --positive: oklch(0.435 0.115 155);
+  --negative: oklch(0.440 0.175 27);
+  --destructive: oklch(0.440 0.175 27);
+  --destructive-foreground: oklch(0.990 0.002 85);
+  --ring: oklch(0.430 0.110 70);
+
+  --dur-instant: 80ms;
+  --dur-fast: 140ms;
+  --dur-base: 200ms;
+  --dur-slow: 320ms;
+
+  --elevation-popover: 0 12px 28px -8px rgb(23 19 12 / 0.14),
+    0 2px 6px -2px rgb(23 19 12 / 0.10);
+  --elevation-overlay: 0 24px 48px -12px rgb(23 19 12 / 0.18),
+    0 4px 10px -3px rgb(23 19 12 / 0.12);
+
+  color-scheme: light;
 }
 
-/* ── Light mode override ──────────────────────────────────────── */
-.light {
-  --background: #f8f8fc;
-  --foreground: #18182b;
-  --card: #ffffff;
-  --card-foreground: #18182b;
-  --popover: #ffffff;
-  --popover-foreground: #18182b;
-  --primary: #4f46e5;
-  --primary-foreground: #ffffff;
-  --secondary: #eef0ff;
-  --secondary-foreground: #1d1d3b;
-  --muted: #f0f0f8;
-  --muted-foreground: #6b6b85;
-  --accent: #e0e7ff;
-  --accent-foreground: #3730a3;
-  --destructive: #dc2626;
-  --destructive-foreground: #ffffff;
-  --success: #16a34a;
-  --success-foreground: #ffffff;
-  --warning: #ca8a04;
-  --warning-foreground: #ffffff;
-  --border: #e2e2f0;
-  --input: #e2e2f0;
-  --ring: #818cf8;
+/* ── Dark ──────────────────────────────────────────────────────── */
+.dark {
+  --background: oklch(0.148 0.005 75);
+  --foreground: oklch(0.955 0.004 85);
+  --card: oklch(0.182 0.006 75);
+  --card-foreground: oklch(0.955 0.004 85);
+  --popover: oklch(0.215 0.007 75);
+  --popover-foreground: oklch(0.955 0.004 85);
+  --surface-raised: oklch(0.245 0.008 75);
+  --surface-sunken: oklch(0.125 0.005 75);
+  --muted: oklch(0.225 0.007 75);
+  --muted-foreground: oklch(0.680 0.008 80);
+  --primary: oklch(0.955 0.004 85);
+  --primary-foreground: oklch(0.148 0.005 75);
+  --secondary: oklch(0.245 0.008 75);
+  --secondary-foreground: oklch(0.955 0.004 85);
+  --accent: oklch(0.245 0.008 75);
+  --accent-foreground: oklch(0.955 0.004 85);
+  --border: oklch(0.300 0.008 75);
+  --border-strong: oklch(0.380 0.010 75);
+  --input: oklch(0.320 0.008 75);
+  --ring: oklch(0.800 0.125 78);
+
+  --signal: oklch(0.800 0.125 78);
+  --signal-subtle: oklch(0.252 0.030 78);
+  --signal-deep: oklch(0.620 0.115 70);
+  --positive: oklch(0.720 0.135 155);
+  --negative: oklch(0.640 0.190 25);
+  --destructive: oklch(0.640 0.190 25);
+  --destructive-foreground: oklch(0.972 0.004 85);
+
+  --elevation-popover: 0 14px 32px -8px rgb(0 0 0 / 0.6),
+    0 2px 6px -2px rgb(0 0 0 / 0.4);
+  --elevation-overlay: 0 28px 56px -12px rgb(0 0 0 / 0.7),
+    0 4px 12px -3px rgb(0 0 0 / 0.45);
+
+  color-scheme: dark;
 }
 
-html {
-  scroll-behavior: smooth;
+/* ── Base ──────────────────────────────────────────────────────── */
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-sans);
+    font-synthesis-weight: none;
+    text-rendering: optimizeLegibility;
+  }
+
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
+  }
+
+  p {
+    text-wrap: pretty;
+  }
+
+  /* Focus rings are architecture: 2px, offset, 3:1 contrast. */
+  :focus-visible {
+    outline: 2px solid var(--ring);
+    outline-offset: 2px;
+  }
+
+  /* iOS Safari zooms any field below 16px. */
+  @media (max-width: 640px) {
+    input,
+    select,
+    textarea {
+      font-size: 1rem;
+    }
+  }
+
+  ::selection {
+    background-color: var(--signal-subtle);
+    color: var(--foreground);
+  }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: var(--font-sans);
+/* ── Utilities ─────────────────────────────────────────────────── */
+
+/* Figures and identifiers. Never body, never headings. */
+@utility num {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+  letter-spacing: -0.01em;
+}
+
+/* Landing display face. 32px and up, marketing surface only. */
+@utility display {
+  font-family: var(--font-display);
+  font-weight: 400;
+  letter-spacing: -0.015em;
+  line-height: 1.05;
+}
+
+/* Table column headers are the only place uppercase is allowed. */
+@utility col-head {
+  font-size: 11px;
+  line-height: 16px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted-foreground);
+}
+
+@utility scroll-thin {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+
+/* Brass marks where you are: active nav, focus rings, and the highlighted row.
+   Menus, selects, and the command palette all share this one treatment. */
+@utility row-highlight {
+  &[data-highlighted],
+  &[data-selected="true"],
+  &[data-state="open"] {
+    background-color: var(--signal-subtle);
+    color: var(--signal);
+  }
+}
+
+@utility row-highlight-danger {
+  &[data-highlighted] {
+    background-color: color-mix(in oklab, var(--negative) 14%, transparent);
+    color: var(--negative);
+  }
+}
+
+@utility animate-shimmer {
+  animation: shimmer 2.4s linear infinite;
+}
+
+@keyframes shimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+
+/* ── Overlays ──────────────────────────────────────────────────────
+   Radix keeps a closing element mounted until its animation ends, so these
+   are real enter/exit animations rather than the no-ops the previous
+   tailwindcss-animate classes were (that plugin was never installed).
+   ────────────────────────────────────────────────────────────────── */
+
+@keyframes lf-overlay-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes lf-overlay-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+@keyframes lf-panel-in {
+  from { opacity: 0; transform: translateY(8px) scale(0.97); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes lf-panel-out {
+  from { opacity: 1; transform: none; }
+  to { opacity: 0; transform: translateY(8px) scale(0.98); }
+}
+@keyframes lf-sheet-in {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+@keyframes lf-sheet-out {
+  from { transform: translateY(0); }
+  to { transform: translateY(100%); }
+}
+@keyframes lf-pop-in {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes lf-pop-out {
+  from { opacity: 1; transform: none; }
+  to { opacity: 0; transform: scale(0.97); }
+}
+/* Radix measures accordion content and exposes the height, so the reveal can
+   animate to an exact value instead of a guessed max-height. */
+@keyframes lf-expand {
+  from { height: 0; }
+  to { height: var(--radix-accordion-content-height); }
+}
+@keyframes lf-collapse {
+  from { height: var(--radix-accordion-content-height); }
+  to { height: 0; }
+}
+
+.overlay-scrim {
+  animation: lf-overlay-in var(--dur-base) var(--ease-out-expo);
+}
+.overlay-scrim[data-state="closed"] {
+  animation: lf-overlay-out var(--dur-fast) var(--ease-in-out-quart);
+}
+
+/* Bottom sheet on touch, centred dialog above 640px. */
+.overlay-panel {
+  animation: lf-sheet-in var(--dur-slow) var(--ease-out-expo);
+}
+.overlay-panel[data-state="closed"] {
+  animation: lf-sheet-out var(--dur-fast) var(--ease-in-out-quart);
+}
+@media (min-width: 640px) {
+  .overlay-panel {
+    animation: lf-panel-in var(--dur-base) var(--ease-out-expo);
+  }
+  .overlay-panel[data-state="closed"] {
+    animation: lf-panel-out var(--dur-fast) var(--ease-in-out-quart);
+  }
+}
+
+/* Menus, popovers, selects, tooltips — origin-aware via Radix Popper. */
+.popover-panel {
+  transform-origin: var(--radix-popper-transform-origin, center);
+  animation: lf-pop-in var(--dur-fast) var(--ease-out-expo);
+}
+.popover-panel[data-state="closed"] {
+  animation: lf-pop-out var(--dur-instant) var(--ease-in-out-quart);
+}
+
+/* Drawers. */
+@keyframes lf-slide-in-left {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(0); }
+}
+@keyframes lf-slide-out-left {
+  from { transform: translateX(0); }
+  to { transform: translateX(-100%); }
+}
+@keyframes lf-slide-in-right {
+  from { transform: translateX(100%); }
+  to { transform: translateX(0); }
+}
+@keyframes lf-slide-out-right {
+  from { transform: translateX(0); }
+  to { transform: translateX(100%); }
+}
+
+.sheet-panel-left {
+  animation: lf-slide-in-left var(--dur-slow) var(--ease-out-expo);
+}
+.sheet-panel-left[data-state="closed"] {
+  animation: lf-slide-out-left var(--dur-base) var(--ease-in-out-quart);
+}
+.sheet-panel-right {
+  animation: lf-slide-in-right var(--dur-slow) var(--ease-out-expo);
+}
+.sheet-panel-right[data-state="closed"] {
+  animation: lf-slide-out-right var(--dur-base) var(--ease-in-out-quart);
+}
+
+/* ── Marketing reveals ─────────────────────────────────────────────
+   Scroll-driven, so the entrance is a function of scroll position rather than
+   JavaScript. Content is visible by default and only animates where
+   `animation-timeline: view()` is supported: a marketing page must never be
+   blank for a crawler, a print stylesheet, or a visitor with JS off.
+   ────────────────────────────────────────────────────────────────── */
+@keyframes lf-reveal-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  @supports (animation-timeline: view()) {
+    .reveal {
+      animation: lf-reveal-in linear both;
+      animation-timeline: view();
+      animation-range: entry 0% entry 55%;
+    }
+  }
+}
+
+/* Printing never scrolls, so the reveal must not hide anything. */
+@media print {
+  .reveal {
+    animation: none;
+  }
+}
+
+/* ── Prose ─────────────────────────────────────────────────────────
+   The typography plugin was never installed, so every `prose` class in the
+   codebase was a no-op. Its palette is mapped onto our tokens once here, which
+   also removes the need for `dark:prose-invert` everywhere.
+   ────────────────────────────────────────────────────────────────── */
+.prose {
+  --tw-prose-body: var(--foreground);
+  --tw-prose-headings: var(--foreground);
+  --tw-prose-lead: var(--muted-foreground);
+  --tw-prose-links: var(--signal);
+  --tw-prose-bold: var(--foreground);
+  --tw-prose-counters: var(--muted-foreground);
+  --tw-prose-bullets: var(--border-strong);
+  --tw-prose-hr: var(--border);
+  --tw-prose-quotes: var(--muted-foreground);
+  --tw-prose-quote-borders: var(--border);
+  --tw-prose-captions: var(--muted-foreground);
+  --tw-prose-code: var(--signal);
+  --tw-prose-pre-code: var(--foreground);
+  --tw-prose-pre-bg: var(--surface-sunken);
+  --tw-prose-th-borders: var(--border);
+  --tw-prose-td-borders: var(--border);
+}
+
+.prose :where(h1, h2, h3, h4):not(:where([class~="not-prose"] *)) {
+  letter-spacing: -0.01em;
+}
+
+/* ── Reduced motion ────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  :root,
+  .dark {
+    --dur-instant: 1ms;
+    --dur-fast: 1ms;
+    --dur-base: 1ms;
+    --dur-slow: 1ms;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }

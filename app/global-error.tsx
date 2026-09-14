@@ -1,9 +1,14 @@
 "use client";
 
 import { useEffect } from "react";
-import { Button } from "@/components/ui/button";
-import { Briefcase, AlertTriangle } from "lucide-react";
 
+import { Logo } from "@/components/brand/logo";
+import { Button } from "@/components/ui/button";
+
+/**
+ * Last line of defence: this renders when the root layout itself fails, so it
+ * has to bring its own html/body and cannot rely on providers.
+ */
 export default function GlobalError({
   error,
   reset,
@@ -12,42 +17,56 @@ export default function GlobalError({
   reset: () => void;
 }) {
   useEffect(() => {
-    console.error(
-      "[LumenForge] Global error boundary caught:",
-      error.message,
-      error.digest ? `(digest: ${error.digest})` : "",
-      error.stack
-    );
+    console.error("[LumenForge] root layout failed:", error);
   }, [error]);
 
   return (
-    <html>
-      <body className="min-h-screen bg-background text-foreground antialiased">
-        <div className="flex min-h-screen flex-col items-center justify-center p-4">
-          <div className="text-center space-y-6 max-w-md">
-            <div className="flex items-center justify-center gap-2 mb-2">
-              <Briefcase className="h-8 w-8 text-primary" />
-              <span className="text-2xl font-semibold tracking-tight">LumenForge</span>
-            </div>
-
-            <div className="mx-auto w-14 h-14 rounded-full bg-destructive/10 flex items-center justify-center">
-              <AlertTriangle className="h-7 w-7 text-destructive" />
-            </div>
-
-            <div className="space-y-2">
-              <h1 className="text-xl font-bold">Something went wrong</h1>
-              <p className="text-sm text-muted-foreground">
-                A critical error occurred. Please try refreshing the page.
-              </p>
-              {error.digest && (
-                <p className="text-xs text-muted-foreground/60 font-mono">
-                  Ref: {error.digest}
-                </p>
-              )}
-            </div>
-
-            <Button onClick={reset} variant="outline" size="lg">
-              Refresh page
+    <html lang="en">
+      <body
+        style={{
+          margin: 0,
+          minHeight: "100vh",
+          display: "grid",
+          placeItems: "center",
+          background: "oklch(0.148 0.005 75)",
+          color: "oklch(0.955 0.004 85)",
+          fontFamily: "ui-sans-serif, system-ui, sans-serif",
+          padding: "1.5rem",
+        }}
+      >
+        <div style={{ maxWidth: "26rem", textAlign: "center" }}>
+          <div style={{ display: "flex", justifyContent: "center", marginBottom: "1.25rem" }}>
+            <Logo />
+          </div>
+          <h1 style={{ fontSize: "15px", fontWeight: 600, margin: 0 }}>
+            LumenForge couldn&rsquo;t start
+          </h1>
+          <p
+            style={{
+              marginTop: "0.5rem",
+              fontSize: "13px",
+              lineHeight: 1.6,
+              color: "oklch(0.68 0.008 80)",
+            }}
+          >
+            This is a failure in the app shell rather than anything you did. Your
+            data is untouched. Reloading usually clears it.
+          </p>
+          {error.digest ? (
+            <p
+              style={{
+                marginTop: "0.75rem",
+                fontFamily: "ui-monospace, monospace",
+                fontSize: "11px",
+                color: "oklch(0.68 0.008 80)",
+              }}
+            >
+              Ref {error.digest}
+            </p>
+          ) : null}
+          <div style={{ marginTop: "1.25rem" }}>
+            <Button onClick={reset} variant="outline">
+              Reload
             </Button>
           </div>
         </div>

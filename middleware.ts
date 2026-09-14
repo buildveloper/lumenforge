@@ -1,17 +1,15 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 import { NextResponse } from "next/server";
 
+// Everything else is protected. Privacy and terms have to be readable by
+// anonymous visitors: they are linked from the marketing footer, and a privacy
+// policy behind a login is both useless and a compliance problem.
 const isPublicRoute = createRouteMatcher([
   "/",
+  "/privacy",
+  "/terms",
   "/sign-in(.*)",
   "/sign-up(.*)",
-]);
-
-const isProtectedRoute = createRouteMatcher([
-  "/dashboard(.*)",
-  "/admin(.*)",
-  "/settings(.*)",
-  "/api/me(.*)",
 ]);
 
 // -- In-memory rate limiter (per IP, per window) ------------------------------

@@ -1,222 +1,199 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
-import {
-  Sparkles,
-  Send,
-  Copy,
-  Check,
-  FileText,
-  ListChecks,
-  Lightbulb,
-  MessageSquare,
-} from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
-import { Card, CardContent } from "@/components/ui/card";
-import { generateAIResponse } from "@/server/actions/ai";
-import { toast } from "sonner";
-import ReactMarkdown from "react-markdown";
+import { useRef, useState } from "react";
+import { ArrowUp, FileText, Lightbulb, ListChecks, Sparkles, Square } from "lucide-react";
+import Markdown from "react-markdown";
 
-const TEMPLATES = [
+import { CopyButton } from "@/components/app/copy-button";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/utils";
+import { useAiStream, type AiTemplate } from "./use-ai-stream";
+
+const TEMPLATES: {
+  type: AiTemplate["type"];
+  label: string;
+  prompt: string;
+  icon: React.ComponentType<{ className?: string }>;
+}[] = [
   {
-    label: "Generate Proposal",
-    icon: FileText,
     type: "proposal",
-    prompt: "Write a professional project proposal for this project.",
+    label: "Draft a proposal",
+    prompt: "Write a client-ready proposal for this project.",
+    icon: FileText,
   },
   {
-    label: "Summarize Progress",
-    icon: Lightbulb,
     type: "summary",
-    prompt: "Summarize the current progress and status of this project.",
+    label: "Summarise progress",
+    prompt: "Write a progress summary I can send to the client.",
+    icon: Lightbulb,
   },
   {
-    label: "Suggest Next Tasks",
-    icon: ListChecks,
     type: "tasks",
-    prompt: "Based on the current project state, suggest the next 5-10 tasks with priorities.",
+    label: "Suggest next tasks",
+    prompt: "What should happen next on this project?",
+    icon: ListChecks,
   },
   {
-    label: "Write Description",
-    icon: MessageSquare,
     type: "description",
-    prompt: "Write a professional, detailed description for this project or its next invoice.",
+    label: "Write the scope",
+    prompt: "Write a clear scope description for this project.",
+    icon: Sparkles,
   },
 ];
 
-type AIAssistantProps = {
-  projectId: string;
-};
-
-export function AIAssistant({ projectId }: AIAssistantProps) {
-  const [prompt, setPrompt] = useState("");
-  const [response, setResponse] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [copied, setCopied] = useState(false);
-  const [displayText, setDisplayText] = useState("");
-  const responseRef = useRef<HTMLDivElement>(null);
-
-  // Typing animation
-  useEffect(() => {
-    if (!response) {
-      setDisplayText("");
-      return;
-    }
-
-    let i = 0;
-    const speed = 10;
-    const interval = setInterval(() => {
-      i++;
-      setDisplayText(response.slice(0, i));
-      if (i >= response.length) clearInterval(interval);
-    }, speed);
-
-    return () => clearInterval(interval);
-  }, [response]);
-
-  async function handleGenerate(
-    type: string,
-    templatePrompt?: string
-  ) {
-    const finalPrompt = prompt.trim() || templatePrompt || "";
-    if (!finalPrompt) return;
-
-    setLoading(true);
-    setResponse("");
-    setDisplayText("");
-
-    try {
-      const result = await generateAIResponse(projectId, finalPrompt, type);
-      if (result.success && result.response) {
-        setResponse(result.response);
-      } else {
-        toast.error(result.error ?? "Generation failed");
-      }
-    } catch {
-      toast.error("AI generation failed. Check your Groq API key.");
-    } finally {
-      setLoading(false);
-    }
+function Output({
+  output,
+  status,
+  error,
+  onStop,
+}: {
+  output: string;
+  status: "idle" | "streaming" | "error";
+  error: string | null;
+  onStop: () => void;
+}) {
+  if (error) {
+    return (
+      <Card className="border-negative/40 bg-negative/5">
+        <CardContent className="py-4">
+          <p className="text-[13px] font-medium text-negative">{error}</p>
+          <p className="mt-1 text-[12px] text-muted-foreground">
+            Nothing was charged and nothing was saved. Adjust the request or try
+            again.
+          </p>
+        </CardContent>
+      </Card>
+    );
   }
 
-  function copyToClipboard() {
-    navigator.clipboard.writeText(response);
-    setCopied(true);
-    toast.success("Copied to clipboard");
-    setTimeout(() => setCopied(false), 2000);
+  if (!output && status === "streaming") {
+    return (
+      <Card>
+        <CardContent className="flex items-center gap-2.5 py-4">
+          <span className="flex gap-1" aria-hidden="true">
+            {[0, 1, 2].map((index) => (
+              <span
+                key={index}
+                className="size-1.5 animate-pulse rounded-full bg-signal"
+                style={{ animationDelay: `${index * 160}ms` }}
+              />
+            ))}
+          </span>
+          <span className="text-[13px] text-muted-foreground">
+            Reading your project and drafting…
+          </span>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (!output) return null;
+
+  return (
+    <Card>
+      <CardContent className="pt-4">
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <span className="text-[11px] font-medium text-muted-foreground">
+            {status === "streaming" ? "Writing" : "Draft"}
+          </span>
+          <div className="flex items-center gap-1">
+            {status === "streaming" ? (
+              <Button variant="ghost" size="sm" className="gap-1.5" onClick={onStop}>
+                <Square className="size-3" />
+                Stop
+              </Button>
+            ) : null}
+            <CopyButton value={output} label="Draft" />
+          </div>
+        </div>
+
+        <div className="prose prose-sm max-w-none">
+          <Markdown>{output}</Markdown>
+          {status === "streaming" ? (
+            <span className="ml-0.5 inline-block h-4 w-[2px] translate-y-0.5 bg-signal" />
+          ) : null}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+export function AIAssistant({ projectId }: { projectId: string }) {
+  const { output, status, error, generate, stop } = useAiStream(projectId);
+  const [prompt, setPrompt] = useState("");
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const busy = status === "streaming";
+
+  function submit() {
+    const value = prompt.trim();
+    if (!value || busy) return;
+    setPrompt("");
+    void generate({ type: "general", prompt: value });
   }
 
   return (
-    <div className="space-y-6">
-      {/* Templates */}
-      <div className="grid gap-3 sm:grid-cols-2">
-        {TEMPLATES.map((t) => (
-          <Card
-            key={t.type}
-            className="border-border/40 bg-card/50 cursor-pointer transition-all duration-200 hover:shadow-md hover:border-primary/30"
-            onClick={() => {
-              setPrompt(t.prompt);
-              handleGenerate(t.type, t.prompt);
-            }}
+    <div className="flex flex-col gap-4">
+      <div className="grid gap-2 sm:grid-cols-2">
+        {TEMPLATES.map((template) => (
+          <button
+            key={template.type}
+            type="button"
+            disabled={busy}
+            onClick={() =>
+              generate({ type: template.type, prompt: template.prompt })
+            }
+            className={cn(
+              "flex items-start gap-3 rounded-lg border border-border bg-card p-3.5 text-left transition-colors",
+              "hover:border-signal/40 hover:bg-surface-raised/40",
+              "disabled:cursor-not-allowed disabled:opacity-50"
+            )}
           >
-            <CardContent className="flex items-center gap-4 py-4">
-              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 shrink-0">
-                <t.icon className="h-5 w-5 text-primary" />
-              </div>
-              <div>
-                <h4 className="font-medium text-sm">{t.label}</h4>
-                <p className="text-xs text-muted-foreground">
-                  Click to generate
-                </p>
-              </div>
-            </CardContent>
-          </Card>
+            <span className="grid size-7 shrink-0 place-items-center rounded-md border border-border bg-surface-sunken text-signal">
+              <template.icon className="size-3.5" />
+            </span>
+            <span className="min-w-0">
+              <span className="block text-[13px] font-medium">
+                {template.label}
+              </span>
+              <span className="mt-0.5 block truncate text-[12px] text-muted-foreground">
+                {template.prompt}
+              </span>
+            </span>
+          </button>
         ))}
       </div>
 
-      {/* Custom prompt */}
-      <div className="flex gap-3">
+      <div className="flex items-end gap-2">
         <Textarea
+          ref={textareaRef}
           value={prompt}
-          onChange={(e) => setPrompt(e.target.value)}
-          placeholder="Or type a custom prompt... (e.g. 'Write a weekly status update for my client')"
-          rows={2}
-          className="min-h-[60px] resize-none"
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
-              e.preventDefault();
-              handleGenerate("general");
+          onChange={(event) => setPrompt(event.target.value)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" && !event.shiftKey) {
+              event.preventDefault();
+              submit();
             }
           }}
+          aria-label="Ask the assistant about this project"
+          placeholder="Ask anything about this project. It reads the tasks, invoices, budget, and deadline."
+          className="min-h-[52px] resize-none"
+          maxLength={5000}
         />
         <Button
+          onClick={submit}
+          disabled={busy || prompt.trim().length === 0}
           size="icon"
-          className="h-[60px] w-[60px] shrink-0"
-          onClick={() => handleGenerate("general")}
-          disabled={loading || !prompt.trim()}
+          aria-label="Send"
+          className="size-[52px] shrink-0"
         >
-          {loading ? (
-            <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary-foreground border-t-transparent" />
-          ) : (
-            <Send className="h-5 w-5" />
-          )}
+          <ArrowUp className="size-4" />
         </Button>
       </div>
 
-      {/* Response */}
-      {loading && !displayText && (
-        <Card className="border-border/40 bg-card/50">
-          <CardContent className="py-8">
-            <div className="flex items-center justify-center gap-3 text-muted-foreground">
-              <Sparkles className="h-5 w-5 animate-pulse text-primary" />
-              <span className="text-sm">Generating AI response...</span>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {displayText && (
-        <Card className="border-border/40 bg-card/50 relative">
-          <CardContent className="py-6">
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Sparkles className="h-4 w-4 text-primary" />
-                AI Response
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                className="gap-2"
-                onClick={copyToClipboard}
-              >
-                {copied ? (
-                  <>
-                    <Check className="h-4 w-4" />
-                    Copied
-                  </>
-                ) : (
-                  <>
-                    <Copy className="h-4 w-4" />
-                    Copy
-                  </>
-                )}
-              </Button>
-            </div>
-
-            <div
-              ref={responseRef}
-              className="prose prose-invert prose-sm max-w-none prose-headings:text-foreground prose-p:text-muted-foreground prose-strong:text-foreground prose-code:text-primary prose-pre:bg-muted prose-pre:border prose-pre:border-border/40"
-            >
-              <ReactMarkdown>{displayText}</ReactMarkdown>
-            </div>
-
-            {loading && (
-              <span className="inline-block w-2 h-5 bg-primary animate-pulse ml-0.5 align-middle" />
-            )}
-          </CardContent>
-        </Card>
-      )}
+      <Output output={output} status={status} error={error} onStop={stop} />
     </div>
   );
 }

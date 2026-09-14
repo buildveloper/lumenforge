@@ -36,6 +36,20 @@
       "when": 1778871087827,
       "tag": "0004_glamorous_katie_power",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1789378191843,
+      "tag": "0005_lively_mandrill",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1789378578395,
+      "tag": "0006_small_nextwave",
+      "breakpoints": true
     }
   ]
 }

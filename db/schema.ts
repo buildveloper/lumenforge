@@ -1,4 +1,10 @@
-import { sqliteTable, text, integer } from "drizzle-orm/sqlite-core";
+import {
+  sqliteTable,
+  text,
+  integer,
+  index,
+  uniqueIndex,
+} from "drizzle-orm/sqlite-core";
 import { sql } from "drizzle-orm";
 
 // -- Users table --------------------------------------------------------------
@@ -10,6 +16,23 @@ export const users = sqliteTable("users", {
   role: text("role", { enum: ["user", "freelancer", "client", "admin"] })
     .notNull()
     .default("user"),
+
+  // Notification preferences. Defaults mirror what the product did before these
+  // were settable, except AI completion: nobody wants to be told about the
+  // generation they just asked for.
+  notifyProjectUpdates: integer("notify_project_updates", { mode: "boolean" })
+    .notNull()
+    .default(true),
+  notifyTaskAssignments: integer("notify_task_assignments", { mode: "boolean" })
+    .notNull()
+    .default(true),
+  notifyInvoiceStatus: integer("notify_invoice_status", { mode: "boolean" })
+    .notNull()
+    .default(true),
+  notifyAiCompletion: integer("notify_ai_completion", { mode: "boolean" })
+    .notNull()
+    .default(false),
+
   createdAt: text("created_at")
     .notNull()
     .default(sql`(datetime('now'))`),
@@ -67,24 +90,38 @@ export const apiKeys = sqliteTable("api_keys", {
 });
 
 // -- Clients table ------------------------------------------------------------
-export const clients = sqliteTable("clients", {
-  id: text("id").primaryKey(),
-  userId: text("user_id")
-    .notNull()
-    .references(() => users.id, { onDelete: "cascade" }),
-  name: text("name").notNull(),
-  email: text("email"),
-  company: text("company"),
-  phone: text("phone"),
-  notes: text("notes"),
-  createdAt: text("created_at")
-    .notNull()
-    .default(sql`(datetime('now'))`),
-  updatedAt: text("updated_at")
-    .notNull()
-    .default(sql`(datetime('now'))`),
-  deletedAt: text("deleted_at"),
-});
+export const clients = sqliteTable(
+  "clients",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    email: text("email"),
+    company: text("company"),
+    phone: text("phone"),
+    notes: text("notes"),
+
+    // Set when the person this record describes signs in and claims it. Every
+    // client-scoped read resolves through this, which is what makes the portal
+    // work: previously client queries compared a clients.id against a Clerk id.
+    clientUserId: text("client_user_id"),
+    claimedAt: text("claimed_at"),
+
+    createdAt: text("created_at")
+      .notNull()
+      .default(sql`(datetime('now'))`),
+    updatedAt: text("updated_at")
+      .notNull()
+      .default(sql`(datetime('now'))`),
+    deletedAt: text("deleted_at"),
+  },
+  (table) => [
+    index("clients_client_user_id_idx").on(table.clientUserId),
+    index("clients_email_idx").on(table.email),
+  ]
+);
 
 // -- Projects table -----------------------------------------------------------
 export const projects = sqliteTable("projects", {
@@ -114,35 +151,44 @@ export const projects = sqliteTable("projects", {
 });
 
 // -- Invoices table -----------------------------------------------------------
-export const invoices = sqliteTable("invoices", {
-  id: text("id").primaryKey(),
-  userId: text("user_id")
-    .notNull()
-    .references(() => users.id, { onDelete: "cascade" }),
-  clientId: text("client_id").references(() => clients.id, {
-    onDelete: "set null",
-  }),
-  projectId: text("project_id").references(() => projects.id, {
-    onDelete: "set null",
-  }),
-  invoiceNumber: text("invoice_number").notNull().unique(),
-  status: text("status", {
-    enum: ["draft", "sent", "paid", "overdue", "cancelled"],
-  })
-    .notNull()
-    .default("draft"),
-  amount: integer("amount").notNull().default(0),
-  notes: text("notes"),
-  dueDate: text("due_date"),
-  paidAt: text("paid_at"),
-  createdAt: text("created_at")
-    .notNull()
-    .default(sql`(datetime('now'))`),
-  updatedAt: text("updated_at")
-    .notNull()
-    .default(sql`(datetime('now'))`),
-  deletedAt: text("deleted_at"),
-});
+export const invoices = sqliteTable(
+  "invoices",
+  {
+    id: text("id").primaryKey(),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    clientId: text("client_id").references(() => clients.id, {
+      onDelete: "set null",
+    }),
+    projectId: text("project_id").references(() => projects.id, {
+      onDelete: "set null",
+    }),
+    // Unique per freelancer, not globally: every freelancer's first invoice is
+    // INV-<year>-001. A global unique index meant only one account in the whole
+    // system could ever hold that number.
+    invoiceNumber: text("invoice_number").notNull(),
+    status: text("status", {
+      enum: ["draft", "sent", "paid", "overdue", "cancelled"],
+    })
+      .notNull()
+      .default("draft"),
+    amount: integer("amount").notNull().default(0),
+    notes: text("notes"),
+    dueDate: text("due_date"),
+    paidAt: text("paid_at"),
+    createdAt: text("created_at")
+      .notNull()
+      .default(sql`(datetime('now'))`),
+    updatedAt: text("updated_at")
+      .notNull()
+      .default(sql`(datetime('now'))`),
+    deletedAt: text("deleted_at"),
+  },
+  (table) => [
+    uniqueIndex("invoices_user_number_idx").on(table.userId, table.invoiceNumber),
+  ]
+);
 
 // -- Tasks table --------------------------------------------------------------
 export const tasks = sqliteTable("tasks", {
