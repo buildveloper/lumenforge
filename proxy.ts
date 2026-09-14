@@ -20,8 +20,12 @@ function isPublic(pathname: string) {
 }
 
 // -- In-memory rate limiter (per IP, per window) ------------------------------
+// 300 rather than 60: a single page view fans out into RSC prefetches and
+// navigations, so a tight limit trips during ordinary clicking and looks like
+// the app is broken. Sign-in brute force is throttled per account separately,
+// in server/actions/auth.ts, where it actually belongs.
 const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
-const RATE_LIMIT_MAX = 60;
+const RATE_LIMIT_MAX = 300;
 const RATE_LIMIT_WINDOW_MS = 60_000;
 
 function isRateLimited(ip: string): boolean {

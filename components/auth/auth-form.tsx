@@ -33,20 +33,32 @@ export function AuthForm({ mode }: { mode: Mode }) {
     setErrors({});
     setPending(true);
 
-    const result = isSignUp
-      ? await signUp({ name, email, password })
-      : await signIn({ email, password });
+    try {
+      const result = isSignUp
+        ? await signUp({ name, email, password })
+        : await signIn({ email, password });
 
-    if (result.ok) {
-      // A hard navigation, not router.push: the session cookie was just set and
-      // the client router still holds a cached unauthenticated render of the
-      // destination. This guarantees the server sees the new session.
-      window.location.assign("/dashboard");
-      return;
+      if (result.ok) {
+        // A hard navigation, not router.push: the session cookie was just set
+        // and the client router still holds a cached unauthenticated render of
+        // the destination. This guarantees the server sees the new session.
+        window.location.assign("/dashboard");
+        return;
+      }
+
+      setErrors({ form: result.error });
+    } catch {
+      // The action itself failed to complete — a dropped connection, a rate
+      // limit, or a server error. Without this the button would sit on
+      // "Creating account…" indefinitely and explain nothing.
+      setErrors({
+        form: isSignUp
+          ? "The server didn't respond, so the account was not created. Check that the app is running and the database is set up, then try again."
+          : "The server didn't respond, so you are not signed in. Check that the app is running, then try again.",
+      });
+    } finally {
+      setPending(false);
     }
-
-    setPending(false);
-    setErrors({ form: result.error });
   }
 
   return (

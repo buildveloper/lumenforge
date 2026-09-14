@@ -100,12 +100,15 @@ cp .env.example .env
 ### 3. Database
 
 ```bash
-mkdir -p data
 npm run db:migrate     # apply the versioned migrations
 ```
 
-`npm run db:push` also works during development. `npm run db:studio` opens
-Drizzle Studio.
+The app creates the `data/` directory on first run, so there is nothing to make
+by hand. `npm run db:push` also works during development, and
+`npm run db:studio` opens Drizzle Studio.
+
+If sign-in reports that it cannot reach the database, this step is the one to
+re-run.
 
 ### 4. Run
 

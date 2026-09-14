@@ -3,3 +3,4 @@
 - Will not trade engineering quality for visual polish; expects production-quality code with sound architecture, maintainability, reusability, accessibility, responsive behavior, and proper error handling. Confidence: 0.8
 - Cares that the product feels fast; avoid visually complex effects that meaningfully hurt performance, bundle size, or loading behavior. Confidence: 0.75
 - Expects functionality to be preserved unless there is a strong UX reason to change it, even during large redesigns. Confidence: 0.7
+- Prefers standard, self-contained implementations over third-party service dependencies when the dependency isn't earning its keep (e.g. chose built-in email/password auth over a hosted provider like Clerk). Confidence: 0.6

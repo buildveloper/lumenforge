@@ -82,25 +82,35 @@ export async function destroyAllSessions(userId: string) {
  *
  * The cookie is only a lookup key. It is checked against an unexpired session
  * row joined to a live user, so a forged or stale cookie resolves to null.
+ *
+ * A database failure resolves to null rather than throwing. That is the safe
+ * direction — an unverifiable session is not a session — and it also means a
+ * broken database degrades to "you are signed out" instead of taking down the
+ * sign-in page, which is the one screen that could explain what is wrong.
  */
 export const getUserId = cache(async (): Promise<string | null> => {
   const token = await getSessionToken();
   if (!token) return null;
 
-  const [row] = await db
-    .select({ userId: sessions.userId })
-    .from(sessions)
-    .innerJoin(users, eq(sessions.userId, users.id))
-    .where(
-      and(
-        eq(sessions.tokenHash, hashToken(token)),
-        gt(sessions.expiresAt, new Date().toISOString()),
-        isNull(users.deletedAt)
+  try {
+    const [row] = await db
+      .select({ userId: sessions.userId })
+      .from(sessions)
+      .innerJoin(users, eq(sessions.userId, users.id))
+      .where(
+        and(
+          eq(sessions.tokenHash, hashToken(token)),
+          gt(sessions.expiresAt, new Date().toISOString()),
+          isNull(users.deletedAt)
+        )
       )
-    )
-    .limit(1);
+      .limit(1);
 
-  return row?.userId ?? null;
+    return row?.userId ?? null;
+  } catch (error) {
+    console.error("[LumenForge] session lookup failed:", error);
+    return null;
+  }
 });
 
 export const requireUserId = cache(async (): Promise<string> => {

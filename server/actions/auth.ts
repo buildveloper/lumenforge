@@ -34,6 +34,14 @@ import {
  */
 export type AuthResult = { ok: true } | { ok: false; error: string };
 
+/**
+ * What the user sees when the database is unreachable or unmigrated. This is
+ * the most common first-run failure, so the message names the fix rather than
+ * saying "something went wrong".
+ */
+const DATABASE_UNREACHABLE =
+  "Couldn't reach the database. Make sure the data directory exists and the migrations have been applied with `npm run db:migrate`, then try again.";
+
 // -- Brute-force throttle ------------------------------------------------------
 
 const ATTEMPT_LIMIT = 8;
@@ -104,23 +112,27 @@ export async function signUp(input: SignUpInput): Promise<AuthResult> {
       createdAt: now,
       updatedAt: now,
     });
+
+    await logActivity({
+      userId: id,
+      action: "account.created",
+      entityType: "user",
+      entityId: id,
+    });
+
+    const { token, expiresAt } = await createSession(id);
+    await setSessionCookie(token, expiresAt);
   } catch (error) {
-    // The unique index is the real guard; the pre-check would race.
+    // The unique index is the real guard; a pre-check would race.
     if (String(error).includes("UNIQUE")) {
-      return { ok: false, error: "An account with that email already exists. Sign in instead." };
+      return {
+        ok: false,
+        error: "An account with that email already exists. Sign in instead.",
+      };
     }
-    throw error;
+    console.error("[LumenForge] sign-up failed:", error);
+    return { ok: false, error: DATABASE_UNREACHABLE };
   }
-
-  await logActivity({
-    userId: id,
-    action: "account.created",
-    entityType: "user",
-    entityId: id,
-  });
-
-  const { token, expiresAt } = await createSession(id);
-  await setSessionCookie(token, expiresAt);
 
   clearAttempts(`signup:${email}`);
   revalidatePath("/", "layout");
@@ -151,23 +163,32 @@ export async function signIn(input: SignInInput): Promise<AuthResult> {
     error: "That email and password don't match an account.",
   };
 
-  const [user] = await db
-    .select({ id: users.id, passwordHash: users.passwordHash, deletedAt: users.deletedAt })
-    .from(users)
-    .where(eq(users.email, email))
-    .limit(1);
+  try {
+    const [user] = await db
+      .select({
+        id: users.id,
+        passwordHash: users.passwordHash,
+        deletedAt: users.deletedAt,
+      })
+      .from(users)
+      .where(eq(users.email, email))
+      .limit(1);
 
-  if (!user || user.deletedAt) {
-    await equalizeTiming(parsed.data.password);
-    return invalid;
+    if (!user || user.deletedAt) {
+      await equalizeTiming(parsed.data.password);
+      return invalid;
+    }
+
+    if (!(await verifyPassword(parsed.data.password, user.passwordHash))) {
+      return invalid;
+    }
+
+    const { token, expiresAt } = await createSession(user.id);
+    await setSessionCookie(token, expiresAt);
+  } catch (error) {
+    console.error("[LumenForge] sign-in failed:", error);
+    return { ok: false, error: DATABASE_UNREACHABLE };
   }
-
-  if (!(await verifyPassword(parsed.data.password, user.passwordHash))) {
-    return invalid;
-  }
-
-  const { token, expiresAt } = await createSession(user.id);
-  await setSessionCookie(token, expiresAt);
 
   clearAttempts(`signin:${email}`);
   revalidatePath("/", "layout");
