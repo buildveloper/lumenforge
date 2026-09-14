@@ -35,12 +35,37 @@ import {
 export type AuthResult = { ok: true } | { ok: false; error: string };
 
 /**
- * What the user sees when the database is unreachable or unmigrated. This is
- * the most common first-run failure, so the message names the fix rather than
- * saying "something went wrong".
+ * Turns a database failure into something the person at the keyboard can act
+ * on. A generic "couldn't reach the database" costs another round trip with
+ * nothing to go on, so the class of failure is named while the full error stays
+ * in the server log.
  */
-const DATABASE_UNREACHABLE =
-  "Couldn't reach the database. Make sure the data directory exists and the migrations have been applied with `npm run db:migrate`, then try again.";
+function describeDatabaseError(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error);
+
+  if (/no such table/i.test(message)) {
+    return "The database is reachable but has no tables yet. Run `npm run db:migrate` and restart the dev server.";
+  }
+  if (/no such column/i.test(message)) {
+    return "The database schema is out of date. Run `npm run db:migrate` and restart the dev server.";
+  }
+  if (/SQLITE_CANTOPEN|unable to open|ENOENT|SQLITE_IOERR|not a database/i.test(message)) {
+    return "The database file couldn't be opened. Check that TURSO_DATABASE_URL points somewhere writable, then run `npm run db:migrate`.";
+  }
+  if (/SQLITE_BUSY|database is locked/i.test(message)) {
+    return "The database is locked by another process. Stop the dev server, run `npm run db:migrate`, then start it again.";
+  }
+  if (/SQLITE_AUTH|UNAUTHORIZED|401|403/i.test(message)) {
+    return "The database rejected the credentials. Check TURSO_AUTH_TOKEN.";
+  }
+  if (/fetch failed|ECONNREFUSED|ENOTFOUND|timeout/i.test(message)) {
+    return "The database server could not be reached. Check that TURSO_DATABASE_URL is correct and reachable.";
+  }
+
+  // Anything unrecognised: say so plainly rather than inventing a cause. The
+  // real message is in the terminal running the app.
+  return "The database returned an unexpected error. The exact message is in the terminal running the app.";
+}
 
 // -- Brute-force throttle ------------------------------------------------------
 
@@ -131,7 +156,7 @@ export async function signUp(input: SignUpInput): Promise<AuthResult> {
       };
     }
     console.error("[LumenForge] sign-up failed:", error);
-    return { ok: false, error: DATABASE_UNREACHABLE };
+    return { ok: false, error: describeDatabaseError(error) };
   }
 
   clearAttempts(`signup:${email}`);
@@ -187,7 +212,7 @@ export async function signIn(input: SignInInput): Promise<AuthResult> {
     await setSessionCookie(token, expiresAt);
   } catch (error) {
     console.error("[LumenForge] sign-in failed:", error);
-    return { ok: false, error: DATABASE_UNREACHABLE };
+    return { ok: false, error: describeDatabaseError(error) };
   }
 
   clearAttempts(`signin:${email}`);

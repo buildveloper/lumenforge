@@ -7,8 +7,15 @@ import { createClient } from "@libsql/client";
 import { drizzle } from "drizzle-orm/libsql";
 import * as schema from "@/db/schema";
 
-const url = process.env.TURSO_DATABASE_URL ?? "file:./data/lumenforge.db";
-const authToken = process.env.TURSO_AUTH_TOKEN;
+/**
+ * A blank variable is not the same as an absent one. `??` would keep an empty
+ * string and hand libSQL a URL of "", which fails with nothing useful to go on.
+ * Treating blank as unset means a `.env` with `TURSO_DATABASE_URL=` still falls
+ * back to the local file.
+ */
+const url =
+  process.env.TURSO_DATABASE_URL?.trim() || "file:./data/lumenforge.db";
+const authToken = process.env.TURSO_AUTH_TOKEN?.trim() || undefined;
 
 /**
  * SQLite cannot create its own parent directory, and `data/` is gitignored, so
