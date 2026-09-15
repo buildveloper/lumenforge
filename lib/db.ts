@@ -1,7 +1,7 @@
 import "server-only";
 
-import { mkdirSync } from "node:fs";
-import { dirname, resolve } from "node:path";
+import { mkdirSync, readFileSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
 
 import { createClient } from "@libsql/client";
 import { drizzle } from "drizzle-orm/libsql";
@@ -72,6 +72,8 @@ export class DatabaseSetupError extends Error {
   }
 }
 
+const MIGRATIONS_DIR = "./db/migrations";
+
 /**
  * The columns the app cannot run without. Checked with `limit 0` queries, which
  * cost nothing and fail only if the column is genuinely absent.
@@ -97,6 +99,65 @@ async function findMissingSchema(): Promise<string[]> {
   return missing;
 }
 
+type LocalMigration = { tag: string; statements: string[] };
+
+/** Reads the shipped migrations, in order, from the journal. */
+function readLocalMigrations(): LocalMigration[] {
+  try {
+    const dir = resolve(MIGRATIONS_DIR);
+    const journal = JSON.parse(
+      readFileSync(join(dir, "meta", "_journal.json"), "utf8")
+    ) as { entries: { tag: string }[] };
+
+    return journal.entries.map((entry) => ({
+      tag: entry.tag,
+      statements: readFileSync(join(dir, `${entry.tag}.sql`), "utf8")
+        .split("--> statement-breakpoint")
+        .map((statement) => statement.trim())
+        .filter(Boolean),
+    }));
+  } catch (error) {
+    console.error("[LumenForge] Could not read the migrations folder:", error);
+    return [];
+  }
+}
+
+/**
+ * Brings a database forward one statement at a time.
+ *
+ * `migrate()` cannot do this for a database whose tables came from
+ * `drizzle-kit push`, because push records no migration history: the migrator
+ * starts at `0000`, finds the table already there, and stops. Replaying the
+ * statements individually is what makes those databases repairable in place
+ * rather than requiring shell access the operator may not have.
+ *
+ * A statement that fails because the object already exists is the outcome we
+ * wanted, so it is logged and skipped. Only a schema that is still incomplete
+ * afterwards is treated as a real failure.
+ */
+async function reconcileStatement(
+  statement: string,
+  tag: string
+): Promise<boolean> {
+  try {
+    await client.execute(statement);
+    return true;
+  } catch (error) {
+    const reason = String(error);
+    const alreadyThere =
+      /duplicate column|already exists|no such index|table .* already exists/i.test(
+        reason
+      );
+
+    if (!alreadyThere) {
+      console.warn(
+        `[LumenForge] ${tag}: statement did not apply (${reason.slice(0, 140)})`
+      );
+    }
+    return false;
+  }
+}
+
 /**
  * Applies migrations once per instance.
  *
@@ -105,28 +166,21 @@ async function findMissingSchema(): Promise<string[]> {
  * operator cannot log in there. Doing it here is what makes a freshly created
  * Turso database, a local file, and the /tmp fallback all work without a manual
  * step.
- *
- * `migrate` is idempotent: it records applied migrations and skips them, so
- * this is a couple of queries per cold start, not a repeated schema build.
- *
- * When it fails, the schema is probed rather than assumed. Migrations cannot
- * run against a database whose tables were created by `drizzle-kit push`, since
- * push writes no migration history — but such a database may still be perfectly
- * usable, and refusing to start would be wrong. Only a genuinely incomplete
- * schema is an error, and then the message names what is missing.
  */
 let ready: Promise<void> | null = null;
 
 export function ensureDatabaseReady(): Promise<void> {
   ready ??= (async () => {
+    // 1. The normal path.
     try {
-      await migrate(db, { migrationsFolder: "./db/migrations" });
+      await migrate(db, { migrationsFolder: MIGRATIONS_DIR });
       return;
     } catch (error) {
       console.error("[LumenForge] migrate() did not complete:", error);
     }
 
-    const missing = await findMissingSchema();
+    // 2. A push-created database may still be perfectly usable as it stands.
+    let missing = await findMissingSchema();
     if (missing.length === 0) {
       console.warn(
         "[LumenForge] Migrations did not apply, but the schema is complete. Continuing."
@@ -134,8 +188,26 @@ export function ensureDatabaseReady(): Promise<void> {
       return;
     }
 
+    // 3. Replay the migrations statement by statement, tolerating the ones whose
+    //    objects already exist. This is what repairs the database in place.
+    console.warn(
+      `[LumenForge] Schema is missing ${missing.join(", ")}. Applying migrations individually…`
+    );
+
+    for (const migration of readLocalMigrations()) {
+      for (const statement of migration.statements) {
+        await reconcileStatement(statement, migration.tag);
+      }
+    }
+
+    missing = await findMissingSchema();
+    if (missing.length === 0) {
+      console.warn("[LumenForge] Schema repaired. Continuing.");
+      return;
+    }
+
     throw new DatabaseSetupError(
-      `the database is missing ${missing.join(", ")}. Its tables were probably created by an older version of the app, or by \`drizzle-kit push\`, which leaves no migration history for the app to apply. Run \`npx drizzle-kit push\` against it to sync the schema, or point the app at an empty database.`
+      `the database is missing ${missing.join(", ")} and could not be repaired automatically. Its tables were probably created by an older version of the app. Run \`npx drizzle-kit push\` against it to sync the schema, or point the app at an empty database.`
     );
   })();
 
