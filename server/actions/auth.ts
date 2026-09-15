@@ -41,30 +41,66 @@ export type AuthResult = { ok: true } | { ok: false; error: string };
  * in the server log.
  */
 function describeDatabaseError(error: unknown): string {
-  const message = error instanceof Error ? error.message : String(error);
+  // Drizzle wraps driver failures in `Failed query: <sql>`. The SQL is noise and
+  // the real problem is in `cause`, so the cause is collected first — otherwise
+  // a truncated message shows only the wrapper and says nothing useful.
+  const cause = (error as { cause?: unknown } | null)?.cause;
+  const causeMessage = cause
+    ? cause instanceof Error
+      ? cause.message
+      : String(cause)
+    : "";
+
+  const code =
+    typeof (error as { code?: unknown })?.code === "string"
+      ? ((error as { code: string }).code)
+      : typeof (cause as { code?: unknown })?.code === "string"
+        ? (cause as { code: string }).code
+        : "";
+
+  const wrapperMessage =
+    error instanceof Error ? error.message : String(error);
+
+  const message = [causeMessage, code, wrapperMessage]
+    .filter(Boolean)
+    .join(" — ");
+
+  // A hosted database answers with an HTTP status, which names the problem
+  // precisely: 404 is a wrong address, 401/403 is a wrong token.
+  const status = message.match(/HTTP status (\d{3})/i)?.[1];
+  if (status === "404") {
+    return "That database address does not exist. Check TURSO_DATABASE_URL in your host's environment variables; it should look like libsql://<name>-<org>.turso.io.";
+  }
+  if (status === "401" || status === "403") {
+    return "The database refused the token. Check TURSO_AUTH_TOKEN in your host's environment variables.";
+  }
 
   if (/no such table/i.test(message)) {
-    return "The database is reachable but has no tables yet. Run `npm run db:migrate` and restart the dev server.";
+    return "The database is reachable but has no tables yet. Run `npm run db:migrate` and restart, or set TURSO_DATABASE_URL on a deployed instance.";
   }
   if (/no such column/i.test(message)) {
-    return "The database schema is out of date. Run `npm run db:migrate` and restart the dev server.";
+    return "The database schema is out of date. Run `npm run db:migrate` and restart the app.";
   }
-  if (/SQLITE_CANTOPEN|unable to open|ENOENT|SQLITE_IOERR|not a database|EROFS|read-only/i.test(message)) {
-    return "The database file couldn't be opened. On a serverless host this usually means no database is configured — set TURSO_DATABASE_URL and TURSO_AUTH_TOKEN.";
+  if (/SQLITE_READONLY|readonly|WRITE_NOT_ALLOWED|read-only|EROFS/i.test(message)) {
+    return "The database is read-only, so nothing can be written. On a serverless host this means no database is configured — set TURSO_DATABASE_URL and TURSO_AUTH_TOKEN.";
+  }
+  if (/SQLITE_CANTOPEN|unable to open|ENOENT|SQLITE_IOERR|not a database|permission|EACCES/i.test(message)) {
+    return "The database file couldn't be opened. Check that TURSO_DATABASE_URL points somewhere writable, then run `npm run db:migrate`.";
   }
   if (/SQLITE_BUSY|database is locked/i.test(message)) {
-    return "The database is locked by another process. Stop the dev server, run `npm run db:migrate`, then start it again.";
+    return "The database is locked by another process. Stop the app, run `npm run db:migrate`, then start it again.";
   }
-  if (/SQLITE_AUTH|UNAUTHORIZED|401|403/i.test(message)) {
+  if (/SQLITE_AUTH|UNAUTHORIZED|401|403|token/i.test(message)) {
     return "The database rejected the credentials. Check TURSO_AUTH_TOKEN.";
   }
-  if (/fetch failed|ECONNREFUSED|ENOTFOUND|timeout/i.test(message)) {
+  if (/fetch failed|ECONNREFUSED|ENOTFOUND|ENETUNREACH|timeout|network/i.test(message)) {
     return "The database server could not be reached. Check that TURSO_DATABASE_URL is correct and reachable.";
   }
 
-  // Anything unrecognised: say so plainly rather than inventing a cause. The
-  // real message is in the terminal running the app.
-  return "The database returned an unexpected error. The exact message is in the terminal running the app.";
+  // Still unrecognised: show the message rather than describing it. Withholding
+  // it costs another round trip and helps nobody.
+  const excerpt = message.slice(0, 220) || "(no message)";
+  return `The database reported: ${excerpt}`;
 }
 
 // -- Brute-force throttle ------------------------------------------------------

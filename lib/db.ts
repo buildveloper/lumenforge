@@ -18,8 +18,12 @@ import * as schema from "@/db/schema";
 const configured = process.env.TURSO_DATABASE_URL?.trim();
 const authToken = process.env.TURSO_AUTH_TOKEN?.trim() || undefined;
 
-/** Vercel sets this. Any serverless host has a read-only, ephemeral filesystem. */
-const isServerless = Boolean(process.env.VERCEL);
+/**
+ * Vercel sets VERCEL=1. Trimmed and compared explicitly rather than coerced,
+ * because a whitespace-only value is truthy and would silently switch a local
+ * run onto the ephemeral /tmp database.
+ */
+const isServerless = process.env.VERCEL?.trim() === "1";
 
 function resolveUrl(): string {
   if (configured) return configured;
@@ -61,23 +65,31 @@ const client = createClient({ url, authToken });
 export const db = drizzle(client, { schema });
 
 /**
- * A SQLite file that was just created has no tables, so every query fails with
- * "no such table" and the operator has no way to run migrations on a machine
- * they cannot log into. Applying them here, once per instance, is what makes
- * the local and /tmp paths work without a manual step.
+ * Applies migrations once per instance.
  *
- * A hosted database is left alone: migrations there are an operator decision.
+ * A database that exists but has no schema fails every query with "no such
+ * table", and on a deployed instance there is no way to run `db:migrate` — the
+ * operator cannot log in there. Doing it here is what makes a freshly created
+ * Turso database, a local file, and the /tmp fallback all work without a manual
+ * step.
+ *
+ * `migrate` is idempotent: it records applied migrations and skips them, so
+ * this is a couple of queries per cold start, not a repeated schema build. If
+ * two instances race on a brand-new database, one may lose; that is caught and
+ * logged, and the winner's schema is the one that stands.
  */
 let ready: Promise<void> | null = null;
 
 export function ensureDatabaseReady(): Promise<void> {
-  if (!isLocalFile) return Promise.resolve();
-
   ready ??= (async () => {
     try {
       await migrate(db, { migrationsFolder: "./db/migrations" });
     } catch (error) {
-      console.error("[LumenForge] Could not apply migrations:", error);
+      console.error(
+        "[LumenForge] Could not apply migrations. If this is the first run " +
+          "against a new database, apply them manually with `npm run db:migrate`.",
+        error
+      );
     }
   })();
 
