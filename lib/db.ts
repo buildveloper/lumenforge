@@ -64,6 +64,39 @@ const client = createClient({ url, authToken });
 
 export const db = drizzle(client, { schema });
 
+/** Thrown when the database exists but does not have the schema this app needs. */
+export class DatabaseSetupError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "DatabaseSetupError";
+  }
+}
+
+/**
+ * The columns the app cannot run without. Checked with `limit 0` queries, which
+ * cost nothing and fail only if the column is genuinely absent.
+ */
+const REQUIRED_SCHEMA: { what: string; probe: string }[] = [
+  { what: "users.password_hash", probe: "select password_hash from users limit 0" },
+  { what: "users.notify_project_updates", probe: "select notify_project_updates from users limit 0" },
+  { what: "clients.client_user_id", probe: "select client_user_id from clients limit 0" },
+  { what: "sessions.token_hash", probe: "select token_hash from sessions limit 0" },
+];
+
+async function findMissingSchema(): Promise<string[]> {
+  const missing: string[] = [];
+
+  for (const check of REQUIRED_SCHEMA) {
+    try {
+      await client.execute(check.probe);
+    } catch {
+      missing.push(check.what);
+    }
+  }
+
+  return missing;
+}
+
 /**
  * Applies migrations once per instance.
  *
@@ -74,9 +107,13 @@ export const db = drizzle(client, { schema });
  * step.
  *
  * `migrate` is idempotent: it records applied migrations and skips them, so
- * this is a couple of queries per cold start, not a repeated schema build. If
- * two instances race on a brand-new database, one may lose; that is caught and
- * logged, and the winner's schema is the one that stands.
+ * this is a couple of queries per cold start, not a repeated schema build.
+ *
+ * When it fails, the schema is probed rather than assumed. Migrations cannot
+ * run against a database whose tables were created by `drizzle-kit push`, since
+ * push writes no migration history — but such a database may still be perfectly
+ * usable, and refusing to start would be wrong. Only a genuinely incomplete
+ * schema is an error, and then the message names what is missing.
  */
 let ready: Promise<void> | null = null;
 
@@ -84,13 +121,22 @@ export function ensureDatabaseReady(): Promise<void> {
   ready ??= (async () => {
     try {
       await migrate(db, { migrationsFolder: "./db/migrations" });
+      return;
     } catch (error) {
-      console.error(
-        "[LumenForge] Could not apply migrations. If this is the first run " +
-          "against a new database, apply them manually with `npm run db:migrate`.",
-        error
-      );
+      console.error("[LumenForge] migrate() did not complete:", error);
     }
+
+    const missing = await findMissingSchema();
+    if (missing.length === 0) {
+      console.warn(
+        "[LumenForge] Migrations did not apply, but the schema is complete. Continuing."
+      );
+      return;
+    }
+
+    throw new DatabaseSetupError(
+      `the database is missing ${missing.join(", ")}. Its tables were probably created by an older version of the app, or by \`drizzle-kit push\`, which leaves no migration history for the app to apply. Run \`npx drizzle-kit push\` against it to sync the schema, or point the app at an empty database.`
+    );
   })();
 
   return ready;

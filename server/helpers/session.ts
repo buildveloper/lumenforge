@@ -89,9 +89,14 @@ export async function destroyAllSessions(userId: string) {
  * sign-in page, which is the one screen that could explain what is wrong.
  */
 export const getUserId = cache(async (): Promise<string | null> => {
-  // A freshly created SQLite file has no tables yet. This is a no-op on a
-  // hosted database, and applies migrations once per instance otherwise.
-  await ensureDatabaseReady();
+  // A schema problem must not take down the page that could explain it, so this
+  // resolves to "signed out" here. The auth actions surface the real error.
+  try {
+    await ensureDatabaseReady();
+  } catch (error) {
+    console.error("[LumenForge] database is not usable:", error);
+    return null;
+  }
 
   const token = await getSessionToken();
   if (!token) return null;

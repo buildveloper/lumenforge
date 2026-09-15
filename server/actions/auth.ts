@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { eq } from "drizzle-orm";
 
-import { db, ensureDatabaseReady } from "@/lib/db";
+import { db, ensureDatabaseReady, DatabaseSetupError } from "@/lib/db";
 import { users } from "@/db/schema";
 import { hashPassword, verifyPassword } from "@/lib/password";
 import {
@@ -41,6 +41,12 @@ export type AuthResult = { ok: true } | { ok: false; error: string };
  * in the server log.
  */
 function describeDatabaseError(error: unknown): string {
+  // The schema itself is wrong, which is a different problem from a query
+  // failing. The message already names what is missing and how to fix it.
+  if (error instanceof DatabaseSetupError) {
+    return `LumenForge cannot use this database: ${error.message}`;
+  }
+
   // Drizzle wraps driver failures in `Failed query: <sql>`. The SQL is noise and
   // the real problem is in `cause`, so the cause is collected first — otherwise
   // a truncated message shows only the wrapper and says nothing useful.

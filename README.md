@@ -217,11 +217,46 @@ This is the only mode where data survives.
    TURSO_DATABASE_URL="libsql://…" TURSO_AUTH_TOKEN="…" npm run db:migrate
    ```
 
-4. Redeploy. The app applies migrations itself only for a local or `/tmp`
-   SQLite file; a hosted database is left to you, deliberately.
+4. Redeploy. The app applies any pending migrations itself on first use, against
+   every kind of database, so this step is a belt-and-braces check rather than a
+   requirement.
 
 Also set `NEXT_PUBLIC_APP_URL` to your production URL, and `GROQ_API_KEY` if you
 want the AI features.
+
+---
+
+## Troubleshooting
+
+**"The database is missing users.password_hash…"**
+
+The database has tables but not the current schema. This happens when the tables
+were created by `drizzle-kit push` rather than by migrations: push writes no
+migration history, so the app's own `migrate()` has nothing to apply and cannot
+bring the schema forward.
+
+Fix it in place, without dropping anything:
+
+```bash
+TURSO_DATABASE_URL="libsql://…" TURSO_AUTH_TOKEN="…" npx drizzle-kit push
+```
+
+Pointing the app at an empty database also works, since it will build the schema
+itself.
+
+**"That database address does not exist" / "The database refused the token"**
+
+`TURSO_DATABASE_URL` or `TURSO_AUTH_TOKEN` is wrong in your host's environment
+variables. Changing them requires a redeploy.
+
+**Sign-up worked, but the account is gone later**
+
+No `TURSO_DATABASE_URL` is configured, so the app is using SQLite in `/tmp`,
+which resets when the instance recycles. See the deployment section above.
+
+**`npm run db:migrate` prints nothing**
+
+A running dev server can hold a lock on the local SQLite file. Stop it first.
 
 ---
 
