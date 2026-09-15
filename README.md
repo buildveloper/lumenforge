@@ -188,10 +188,40 @@ Built in, with no third-party identity provider.
 
 ## Deployment (Vercel)
 
-1. Push to GitHub and import the project in Vercel.
-2. Add every environment variable from the table above.
-3. Set `TURSO_DATABASE_URL` and `TURSO_AUTH_TOKEN` to your production database.
-4. `npm run db:migrate` against the production database.
+### Without a database configured
+
+The app deploys and runs with no database variables, but read what that means
+before relying on it.
+
+Vercel's deployment filesystem is read-only, so `./data/lumenforge.db` cannot
+exist there. When `TURSO_DATABASE_URL` is unset and the app detects a serverless
+host, it falls back to SQLite in `/tmp` — the one writable path — and applies the
+schema automatically on first use.
+
+`/tmp` belongs to the instance. When the instance recycles the data is gone, and
+two instances running at once do not share a database. That is fine for a demo
+and wrong for anything real. The server log says so on every cold start.
+
+### With Turso (persistent)
+
+This is the only mode where data survives.
+
+1. Create a database at [turso.tech](https://turso.tech). The free tier is
+   plenty for this.
+2. In Vercel → Settings → Environment Variables, set:
+   - `TURSO_DATABASE_URL` — the `libsql://…` URL
+   - `TURSO_AUTH_TOKEN` — the token
+3. Apply the schema to it once, from your machine:
+
+   ```bash
+   TURSO_DATABASE_URL="libsql://…" TURSO_AUTH_TOKEN="…" npm run db:migrate
+   ```
+
+4. Redeploy. The app applies migrations itself only for a local or `/tmp`
+   SQLite file; a hosted database is left to you, deliberately.
+
+Also set `NEXT_PUBLIC_APP_URL` to your production URL, and `GROQ_API_KEY` if you
+want the AI features.
 
 ---
 

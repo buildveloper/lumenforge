@@ -5,7 +5,7 @@ import { cookies } from "next/headers";
 import { createHash } from "node:crypto";
 import { and, eq, gt, isNull, lt } from "drizzle-orm";
 
-import { db } from "@/lib/db";
+import { db, ensureDatabaseReady } from "@/lib/db";
 import { sessions, users } from "@/db/schema";
 import { generateSessionToken } from "@/lib/password";
 import { SESSION_COOKIE, SESSION_DURATION_MS } from "@/lib/session-cookie";
@@ -89,6 +89,10 @@ export async function destroyAllSessions(userId: string) {
  * sign-in page, which is the one screen that could explain what is wrong.
  */
 export const getUserId = cache(async (): Promise<string | null> => {
+  // A freshly created SQLite file has no tables yet. This is a no-op on a
+  // hosted database, and applies migrations once per instance otherwise.
+  await ensureDatabaseReady();
+
   const token = await getSessionToken();
   if (!token) return null;
 

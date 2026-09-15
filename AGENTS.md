@@ -127,7 +127,10 @@ throw-or-`{ success: true }` rule.
 
 ## Known environment notes
 
+- Deployed instances have no persistent database unless `TURSO_DATABASE_URL` is
+  set. Without it the app falls back to SQLite in `/tmp`, which works but resets
+  when the instance recycles. See the README deployment section.
 - `NODE_ENV=production` may be set in the shell, which makes npm skip
   devDependencies silently. Use `npm install --include=dev`.
-- `middleware.ts` triggers a Next 16 deprecation warning suggesting `proxy.ts`.
-  Left as-is on purpose: it is the auth layer and works.
+- `npm run db:generate` names migrations after a random phrase; the numbering is
+  what matters, not the name.

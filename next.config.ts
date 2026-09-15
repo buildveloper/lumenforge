@@ -23,6 +23,14 @@ const csp = [
 ].join("; ");
 
 const nextConfig: NextConfig = {
+  /**
+   * The SQLite path applies migrations at runtime from `db/migrations`, which is
+   * source rather than an import, so the tracer would otherwise leave it out of
+   * the deployment and the schema would never be created.
+   */
+  outputFileTracingIncludes: {
+    "/**": ["./db/migrations/**"],
+  },
   async headers() {
     return [
       {

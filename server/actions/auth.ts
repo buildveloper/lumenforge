@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { eq } from "drizzle-orm";
 
-import { db } from "@/lib/db";
+import { db, ensureDatabaseReady } from "@/lib/db";
 import { users } from "@/db/schema";
 import { hashPassword, verifyPassword } from "@/lib/password";
 import {
@@ -49,8 +49,8 @@ function describeDatabaseError(error: unknown): string {
   if (/no such column/i.test(message)) {
     return "The database schema is out of date. Run `npm run db:migrate` and restart the dev server.";
   }
-  if (/SQLITE_CANTOPEN|unable to open|ENOENT|SQLITE_IOERR|not a database/i.test(message)) {
-    return "The database file couldn't be opened. Check that TURSO_DATABASE_URL points somewhere writable, then run `npm run db:migrate`.";
+  if (/SQLITE_CANTOPEN|unable to open|ENOENT|SQLITE_IOERR|not a database|EROFS|read-only/i.test(message)) {
+    return "The database file couldn't be opened. On a serverless host this usually means no database is configured — set TURSO_DATABASE_URL and TURSO_AUTH_TOKEN.";
   }
   if (/SQLITE_BUSY|database is locked/i.test(message)) {
     return "The database is locked by another process. Stop the dev server, run `npm run db:migrate`, then start it again.";
@@ -128,6 +128,8 @@ export async function signUp(input: SignUpInput): Promise<AuthResult> {
   const now = new Date().toISOString();
 
   try {
+    await ensureDatabaseReady();
+
     await db.insert(users).values({
       id,
       email,
@@ -189,6 +191,8 @@ export async function signIn(input: SignInInput): Promise<AuthResult> {
   };
 
   try {
+    await ensureDatabaseReady();
+
     const [user] = await db
       .select({
         id: users.id,
