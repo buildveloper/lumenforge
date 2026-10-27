@@ -38,15 +38,19 @@ export function AuthForm({ mode }: { mode: Mode }) {
         ? await signUp({ name, email, password })
         : await signIn({ email, password });
 
-      if (result.ok) {
-        // A hard navigation, not router.push: the session cookie was just set
-        // and the client router still holds a cached unauthenticated render of
-        // the destination. This guarantees the server sees the new session.
-        window.location.assign("/dashboard");
+      if (!result.ok) {
+        if (result.field) {
+          setErrors({ [result.field]: result.error });
+        } else {
+          setErrors({ form: result.error });
+        }
         return;
       }
 
-      setErrors({ form: result.error });
+      // A hard navigation, not router.push: the session cookie was just set
+      // and the client router still holds a cached unauthenticated render of
+      // the destination. This guarantees the server sees the new session.
+      window.location.assign("/dashboard");
     } catch {
       // The action itself failed to complete — a dropped connection, a rate
       // limit, or a server error. Without this the button would sit on

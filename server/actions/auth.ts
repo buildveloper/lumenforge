@@ -32,7 +32,73 @@ import {
  * redacts thrown error messages from Server Actions in production — a throw
  * would surface as a generic digest instead of "that password is incorrect".
  */
-export type AuthResult = { ok: true } | { ok: false; error: string };
+export type AuthResult =
+  | { ok: true }
+  | {
+      ok: false;
+      error: string;
+      /** Render the message under this input instead of the form banner. */
+      field?: "name" | "email" | "password";
+    };
+
+// -- Error classification ------------------------------------------------------
+
+type ErrorChain = { messages: string[]; codes: string[] };
+
+/**
+ * Collects the messages and codes on an error's cause chain.
+ *
+ * Drizzle wraps driver failures in a `DrizzleQueryError` whose own message is
+ * `Failed query: <sql>\nparams: <bound values>`. The useful error — in libSQL's
+ * case a `LibsqlError` — is one level down in `cause`, so anything that reads
+ * only `error.message` sees the SQL wrapper and misses the actual failure.
+ */
+function errorChain(error: unknown): ErrorChain {
+  const messages: string[] = [];
+  const codes: string[] = [];
+  const seen = new Set<unknown>();
+  let current: unknown = error;
+
+  while (
+    current &&
+    typeof current === "object" &&
+    !seen.has(current) &&
+    messages.length < 8
+  ) {
+    seen.add(current);
+
+    const candidate = current as {
+      message?: unknown;
+      code?: unknown;
+      cause?: unknown;
+    };
+
+    if (typeof candidate.message === "string" && candidate.message) {
+      messages.push(candidate.message);
+    }
+    if (typeof candidate.code === "string" && candidate.code) {
+      codes.push(candidate.code);
+    }
+
+    current = candidate.cause;
+  }
+
+  return { messages, codes };
+}
+
+/**
+ * True only for the email unique index. Matching the column keeps a future
+ * UNIQUE violation on another table from being reported as a taken email.
+ */
+function isDuplicateEmailError(error: unknown): boolean {
+  const { messages, codes } = errorChain(error);
+  const text = [...messages, ...codes].join(" — ");
+
+  return (
+    /UNIQUE constraint failed:\s*users\.email/i.test(text) ||
+    /users_email_unique/i.test(text)
+  );
+}
 
 /**
  * Turns a database failure into something the person at the keyboard can act
@@ -47,29 +113,14 @@ function describeDatabaseError(error: unknown): string {
     return `LumenForge cannot use this database: ${error.message}`;
   }
 
-  // Drizzle wraps driver failures in `Failed query: <sql>`. The SQL is noise and
-  // the real problem is in `cause`, so the cause is collected first — otherwise
-  // a truncated message shows only the wrapper and says nothing useful.
-  const cause = (error as { cause?: unknown } | null)?.cause;
-  const causeMessage = cause
-    ? cause instanceof Error
-      ? cause.message
-      : String(cause)
-    : "";
-
-  const code =
-    typeof (error as { code?: unknown })?.code === "string"
-      ? ((error as { code: string }).code)
-      : typeof (cause as { code?: unknown })?.code === "string"
-        ? (cause as { code: string }).code
-        : "";
-
-  const wrapperMessage =
-    error instanceof Error ? error.message : String(error);
-
-  const message = [causeMessage, code, wrapperMessage]
-    .filter(Boolean)
-    .join(" — ");
+  // The wrapper carries the SQL and every bound parameter, and on sign-up the
+  // parameters include the password hash. Only the driver messages are shown;
+  // the wrapper stays in the server log.
+  const { messages, codes } = errorChain(error);
+  const driverText = [
+    ...new Set(messages.filter((message) => !/^Failed query:/i.test(message))),
+  ].join(" — ");
+  const message = [...new Set([driverText, ...codes])].filter(Boolean).join(" — ");
 
   // A hosted database answers with an HTTP status, which names the problem
   // precisely: 404 is a wrong address, 401/403 is a wrong token.
@@ -103,10 +154,14 @@ function describeDatabaseError(error: unknown): string {
     return "The database server could not be reached. Check that TURSO_DATABASE_URL is correct and reachable.";
   }
 
-  // Still unrecognised: show the message rather than describing it. Withholding
-  // it costs another round trip and helps nobody.
-  const excerpt = message.slice(0, 220) || "(no message)";
-  return `The database reported: ${excerpt}`;
+  // Still unrecognised: show the driver's own message rather than describing
+  // it. Withholding it costs another round trip and helps nobody. If the only
+  // text available is the Drizzle wrapper, say nothing rather than echo SQL.
+  if (!driverText) {
+    return "The database rejected the query. Check the server log for details.";
+  }
+
+  return `The database reported: ${message.slice(0, 220)}`;
 }
 
 // -- Brute-force throttle ------------------------------------------------------
@@ -171,7 +226,12 @@ export async function signUp(input: SignUpInput): Promise<AuthResult> {
 
   try {
     await ensureDatabaseReady();
+  } catch (error) {
+    console.error("[LumenForge] sign-up failed:", error);
+    return { ok: false, error: describeDatabaseError(error) };
+  }
 
+  try {
     await db.insert(users).values({
       id,
       email,
@@ -181,26 +241,44 @@ export async function signUp(input: SignUpInput): Promise<AuthResult> {
       createdAt: now,
       updatedAt: now,
     });
+  } catch (error) {
+    // The unique index is the real guard; a pre-check would race.
+    if (isDuplicateEmailError(error)) {
+      return {
+        ok: false,
+        error: "An account with that email already exists. Sign in instead.",
+        field: "email",
+      };
+    }
+    console.error("[LumenForge] sign-up failed:", error);
+    return { ok: false, error: describeDatabaseError(error) };
+  }
 
+  // The account exists from here on. A failure below must not tell the person
+  // otherwise, because they will retry and hit the unique index.
+  try {
+    const { token, expiresAt } = await createSession(id);
+    await setSessionCookie(token, expiresAt);
+  } catch (error) {
+    console.error("[LumenForge] account created, but the session failed:", error);
+    return {
+      ok: false,
+      error:
+        "Your account was created, but you could not be signed in automatically. Go to sign in and use the password you just chose.",
+    };
+  }
+
+  // The audit trail is secondary to the account existing. A failed log insert
+  // must not turn a successful sign-up into a retry that hits the unique index.
+  try {
     await logActivity({
       userId: id,
       action: "account.created",
       entityType: "user",
       entityId: id,
     });
-
-    const { token, expiresAt } = await createSession(id);
-    await setSessionCookie(token, expiresAt);
   } catch (error) {
-    // The unique index is the real guard; a pre-check would race.
-    if (String(error).includes("UNIQUE")) {
-      return {
-        ok: false,
-        error: "An account with that email already exists. Sign in instead.",
-      };
-    }
-    console.error("[LumenForge] sign-up failed:", error);
-    return { ok: false, error: describeDatabaseError(error) };
+    console.error("[LumenForge] account created, but the activity log failed:", error);
   }
 
   clearAttempts(`signup:${email}`);
